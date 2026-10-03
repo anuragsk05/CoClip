@@ -30,3 +30,7 @@ rust-migration-notes.md
 # MHacks collaboration
 .spacetime/
 collaboration/.env
+init.py
+
+# macOS
+.DS_Store
