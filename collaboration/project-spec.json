@@ -1,0 +1,16 @@
+{
+  "name": "opencut-multiplayer",
+  "source": "OpenCut Classic",
+  "upstream": "https://github.com/OpenCut-app/opencut-classic.git",
+  "canonicalState": "SpacetimeDB",
+  "mediaStorage": [
+    "local",
+    "S3",
+    "R2"
+  ],
+  "clients": [
+    "OpenCut editor",
+    "AI agent"
+  ],
+  "milestone1": "Mirror a clip move between two browser sessions"
+}

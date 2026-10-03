@@ -1,0 +1,23 @@
+{
+  "name": "@opencut/collab-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./bindings": "./src/module_bindings/index.ts"
+  },
+  "scripts": {
+    "generate": "spacetime generate --lang typescript --module-path ../spacetimedb --out-dir ./src/module_bindings --yes",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "spacetimedb": "^2.10.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^6.0.2"
+  }
+}

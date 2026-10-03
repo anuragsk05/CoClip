@@ -1,0 +1,22 @@
+{
+  "name": "@opencut/collab-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "chat": "bun src/cli.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.27.0",
+    "@opencut/collab-client": "workspace:*",
+    "spacetimedb": "^2.10.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2"
+  }
+}

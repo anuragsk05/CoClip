@@ -1,0 +1,12 @@
+[package]
+name = "timeline"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/timeline.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+time = { version = "0.1.0", path = "../time" }
+serde = { version = "1", features = ["derive"] }

@@ -1,0 +1,19 @@
+[package]
+name = "opencut_collab"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+spacetimedb = "2.10.*"
+log = "0.4"
+time = { version = "0.1.0", path = "../../rust/crates/time" }
+timeline = { version = "0.1.0", path = "../../rust/crates/timeline" }
+
+[profile.release]
+opt-level = "z"
+lto = true
