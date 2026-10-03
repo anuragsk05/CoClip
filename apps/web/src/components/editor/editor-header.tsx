@@ -28,6 +28,7 @@ import Image from "next/image";
 import { cn } from "@/utils/ui";
 import { AgentPanel } from "@/collaboration/components/agent-panel";
 import { Collaborators } from "@/collaboration/components/collaborators";
+import { ShareLink } from "@/collaboration/components/share-link";
 import { useCollaborationState } from "@/collaboration/collaboration-provider";
 
 export function EditorHeader() {
@@ -39,6 +40,7 @@ export function EditorHeader() {
 			</div>
 			<nav className="flex items-center gap-2">
 				<CollaboratorsIndicator />
+				<ShareLink />
 				<AgentPanel />
 				<FeedbackPopover />
 				<ExportButton />

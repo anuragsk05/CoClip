@@ -10,6 +10,7 @@
  */
 
 import {
+	ApiError,
 	FunctionCallingConfigMode,
 	GoogleGenAI,
 	ThinkingLevel,
@@ -83,7 +84,7 @@ export async function runAgent(options: RunOptions): Promise<RunOutcome> {
 	];
 
 	for (let step = 0; step < maxSteps; step += 1) {
-		const response = await ai.models.generateContent({
+		const response = await generateContent(ai, {
 			model,
 			contents,
 			config: {
@@ -166,4 +167,39 @@ function toDeclarations(): FunctionDeclaration[] {
 		description: tool.description,
 		parametersJsonSchema: tool.parameters,
 	}));
+}
+
+const OVERLOAD_ATTEMPTS = 4;
+
+async function generateContent(
+	ai: GoogleGenAI,
+	request: Parameters<GoogleGenAI["models"]["generateContent"]>[0],
+) {
+	let lastError: unknown;
+	for (let attempt = 0; attempt < OVERLOAD_ATTEMPTS; attempt += 1) {
+		try {
+			return await ai.models.generateContent(request);
+		} catch (error) {
+			lastError = error;
+			if (!isModelOverloaded(error) || attempt === OVERLOAD_ATTEMPTS - 1) {
+				throw error;
+			}
+			await delay(1000 * 2 ** attempt);
+		}
+	}
+	throw lastError;
+}
+
+function isModelOverloaded(error: unknown): boolean {
+	if (error instanceof ApiError && error.status === 503) {
+		return true;
+	}
+	const message = error instanceof Error ? error.message : String(error);
+	return message.includes("UNAVAILABLE") || message.includes("high demand");
+}
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 }

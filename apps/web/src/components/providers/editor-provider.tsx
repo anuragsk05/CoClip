@@ -9,6 +9,8 @@ import { useKeybindingsListener } from "@/actions/use-keybindings";
 import { useKeybindingsStore } from "@/actions/keybindings-store";
 import { useTimelineStore } from "@/timeline/timeline-store";
 import { CollaborationProvider } from "@/collaboration/collaboration-provider";
+import { isCollaborationEnabled } from "@/collaboration/config";
+import { joinSharedProject } from "@/collaboration/join";
 import { useEditorActions } from "@/actions/use-editor-actions";
 import { loadFontAtlas } from "@/fonts/google-fonts";
 import {
@@ -54,6 +56,16 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 					err instanceof Error &&
 					(err.message.includes("not found") ||
 						err.message.includes("does not exist"));
+
+				if (isNotFound && isCollaborationEnabled()) {
+					const joined = await joinSharedProject({ projectId, editor });
+					if (cancelled) return;
+					if (joined) {
+						setIsLoading(false);
+						loadFontAtlas();
+						return;
+					}
+				}
 
 				if (isNotFound) {
 					try {

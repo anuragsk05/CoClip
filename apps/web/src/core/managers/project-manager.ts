@@ -186,6 +186,37 @@ export class ProjectManager {
 		}
 	}
 
+	/**
+	 * Stores a project that already exists in SpacetimeDB.
+	 *
+	 * The id and scene ids have to match the shared project. A freshly generated
+	 * local project would publish itself as a different timeline.
+	 */
+	async adoptSharedProject({ project }: { project: TProject }): Promise<void> {
+		this.editor.save.pause();
+		await this.ensureStorageMigrations();
+		this.editor.media.clearAllAssets();
+		this.editor.scenes.clearScenes();
+
+		try {
+			this.active = project;
+			this.notify();
+			this.editor.scenes.initializeScenes({
+				scenes: project.scenes,
+				currentSceneId: project.currentSceneId,
+			});
+			await storageService.saveProject({ project });
+			this.updateMetadata(project);
+		} catch (error) {
+			console.error("Failed to adopt shared project:", error);
+			throw error;
+		} finally {
+			this.isLoading = false;
+			this.notify();
+			this.editor.save.resume();
+		}
+	}
+
 	async saveCurrentProject(): Promise<void> {
 		if (!this.active) return;
 
