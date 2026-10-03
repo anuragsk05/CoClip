@@ -93,8 +93,9 @@ export async function runAgent(options: RunOptions): Promise<RunOutcome> {
 					functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO },
 				},
 				thinkingConfig: {
+					// gemini-3.8-flash rejects MINIMAL. LOW is the smallest level it accepts.
 					thinkingLevel:
-						mode === "goal" ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+						mode === "goal" ? ThinkingLevel.MEDIUM : ThinkingLevel.LOW,
 				},
 			},
 		});
