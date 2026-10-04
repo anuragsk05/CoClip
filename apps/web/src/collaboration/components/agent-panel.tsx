@@ -69,8 +69,10 @@ export function AgentPanel() {
 					{
 						role: "agent",
 						text:
-							raw.trim().slice(0, 500) ||
-							"The agent server returned an empty response.",
+							response.status === 504
+								? "The agent timed out on the server before it could answer."
+								: raw.trim().slice(0, 500) ||
+									"The agent server returned an empty response.",
 					},
 				]);
 				return;

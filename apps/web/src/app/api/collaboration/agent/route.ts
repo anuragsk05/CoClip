@@ -4,7 +4,9 @@ import { CollabAgent, runAgent } from "@opencut/collab-agent";
 import type { AgentMode } from "@opencut/collab-agent";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Hobby projects on Fluid Compute allow 300s. Sixty seconds is what the
+// function was dying at while it downloaded every media file.
+export const maxDuration = 300;
 
 const PROJECT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 

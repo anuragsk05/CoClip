@@ -50,6 +50,10 @@ export class CollabAgent {
 			database: options.database,
 			projectId: options.projectId,
 			asAgent: true,
+			// Media bytes can be hundreds of megabytes. The model only reads
+			// asset names, and downloading them on a serverless function times out.
+			includeMediaBytes: false,
+			connectTimeoutMs: 15_000,
 			profile: {
 				name: options.name ?? "AI Agent",
 				color: options.color ?? "#8b5cf6",

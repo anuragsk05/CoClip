@@ -46,6 +46,11 @@ export interface SessionOptions extends ConnectOptions {
 	asAgent?: boolean;
 	/** Share-invite token from the live link. Empty or omitted is view-only. */
 	inviteToken?: string;
+	/**
+	 * When false, shared media bytes are not downloaded.
+	 * The agent only needs asset names and durations.
+	 */
+	includeMediaBytes?: boolean;
 }
 
 export interface SnapshotChange {
@@ -87,6 +92,7 @@ export class CollabSession {
 	#departure: SessionDeparture | null = null;
 	/** Set before `leave_session` so a deleted row is not reported as a removal. */
 	#leftVoluntarily = false;
+	#includeMediaBytes = true;
 
 	private constructor(connection: DbConnection, projectId: string) {
 		this.#connection = connection;
@@ -102,18 +108,24 @@ export class CollabSession {
 		const session = new CollabSession(connection, options.projectId);
 		session.#inviteToken = options.inviteToken ?? "";
 		session.#displayName = options.profile?.name?.trim() ?? "";
+		session.#includeMediaBytes = options.includeMediaBytes !== false;
 
-		if (options.asAgent) {
-			await connection.reducers.declareAgent({
-				name: options.profile?.name ?? "AI Agent",
-			});
-		} else if (options.profile) {
-			await connection.reducers.setUserProfile(options.profile);
+		try {
+			if (options.asAgent) {
+				await connection.reducers.declareAgent({
+					name: options.profile?.name ?? "AI Agent",
+				});
+			} else if (options.profile) {
+				await connection.reducers.setUserProfile(options.profile);
+			}
+
+			await session.#subscribe();
+			await session.#joinWhenProjectExists();
+			return session;
+		} catch (error) {
+			connection.disconnect();
+			throw error;
 		}
-
-		await session.#subscribe();
-		await session.#joinWhenProjectExists();
-		return session;
 	}
 
 	get identity(): string {
@@ -766,29 +778,48 @@ export class CollabSession {
 		const scoped = (table: string, column = "project_id") =>
 			`SELECT * FROM ${table} WHERE ${column} = '${this.projectId}'`;
 
+		const queries = [
+			scoped("project", "id"),
+			scoped("project_metadata"),
+			scoped("project_member"),
+			scoped("scene"),
+			scoped("track"),
+			scoped("clip"),
+			scoped("clip_effect"),
+			scoped("asset"),
+			scoped("presence"),
+			scoped("edit_history"),
+			scoped("share_invite"),
+			scoped("collaborator"),
+			scoped("live_session"),
+			// Collaborator names and colours are not project-scoped.
+			"SELECT * FROM user",
+		];
+		if (this.#includeMediaBytes) {
+			queries.push(scoped("asset_chunk"));
+		}
+
 		await new Promise<void>((resolve, reject) => {
+			const timer = this.#includeMediaBytes
+				? undefined
+				: setTimeout(() => {
+						reject(new Error("Timed out waiting for the project"));
+					}, 20_000);
 			this.#connection
 				.subscriptionBuilder()
-				.onApplied(() => resolve())
-				.onError((_ctx) => reject(new Error("project subscription failed")))
-				.subscribe([
-					scoped("project", "id"),
-					scoped("project_metadata"),
-					scoped("project_member"),
-					scoped("scene"),
-					scoped("track"),
-					scoped("clip"),
-					scoped("clip_effect"),
-					scoped("asset"),
-					scoped("asset_chunk"),
-					scoped("presence"),
-					scoped("edit_history"),
-					scoped("share_invite"),
-					scoped("collaborator"),
-					scoped("live_session"),
-					// Collaborator names and colours are not project-scoped.
-					"SELECT * FROM user",
-				]);
+				.onApplied(() => {
+					if (timer !== undefined) {
+						clearTimeout(timer);
+					}
+					resolve();
+				})
+				.onError((_ctx) => {
+					if (timer !== undefined) {
+						clearTimeout(timer);
+					}
+					reject(new Error("project subscription failed"));
+				})
+				.subscribe(queries);
 		});
 
 		// History rows already present are this project's past, not news. Anything
@@ -802,7 +833,9 @@ export class CollabSession {
 		this.#watchHistory();
 		this.#watchAccess();
 		this.#watchLiveSession();
-		this.#watchAssetChunks();
+		if (this.#includeMediaBytes) {
+			this.#watchAssetChunks();
+		}
 	}
 
 	/**

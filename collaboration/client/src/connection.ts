@@ -24,6 +24,8 @@ export interface ConnectOptions {
 	database: string;
 	tokenStore?: TokenStore;
 	onDisconnect?: (error?: Error) => void;
+	/** Rejects the attempt if the socket has not opened in this many milliseconds. */
+	connectTimeoutMs?: number;
 }
 
 const TOKEN_KEY = "opencut.collab.token";
@@ -93,17 +95,46 @@ export function connect(options: ConnectOptions): Promise<DbConnection> {
 
 	return new Promise((resolve, reject) => {
 		let settled = false;
+		const timer =
+			options.connectTimeoutMs === undefined
+				? undefined
+				: setTimeout(() => {
+						if (settled) {
+							return;
+						}
+						settled = true;
+						reject(
+							new Error(
+								`Timed out connecting to ${options.database} after ${options.connectTimeoutMs}ms`,
+							),
+						);
+					}, options.connectTimeoutMs);
+
+		const finish = () => {
+			if (timer !== undefined) {
+				clearTimeout(timer);
+			}
+		};
 
 		DbConnection.builder()
 			.withUri(options.uri)
 			.withDatabaseName(options.database)
 			.withToken(tokenStore.get())
 			.onConnect((connection, _identity, token) => {
+				if (settled) {
+					connection.disconnect();
+					return;
+				}
+				finish();
 				tokenStore.set(token);
 				settled = true;
 				resolve(connection);
 			})
 			.onConnectError((_ctx, error) => {
+				if (settled) {
+					return;
+				}
+				finish();
 				settled = true;
 				reject(error);
 			})
@@ -111,6 +142,7 @@ export function connect(options: ConnectOptions): Promise<DbConnection> {
 				// A disconnect before `onConnect` is a failed connection attempt, so
 				// it has to reject the promise rather than fire the disconnect hook.
 				if (!settled) {
+					finish();
 					settled = true;
 					reject(error ?? new Error("disconnected before connecting"));
 					return;
