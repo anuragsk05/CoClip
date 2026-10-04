@@ -2,7 +2,7 @@
 
 ```text
                Media Storage
-          (local / S3 / Cloudflare R2)
+          (browser cache / shared chunks)
                     │
                     ↓
              Asset references
@@ -55,7 +55,10 @@
 
 ## Flow
 
-Media bytes stay in local storage, S3, or Cloudflare R2. The editor only receives asset references.
+Media is cached in browser storage. Video, audio, and image files are currently
+shared through SpacetimeDB asset chunks and reassembled into local playable
+copies. Asset references also support local, S3, and R2 storage types; the browser
+sharing path currently uses SpacetimeDB. The agent subscribes without media bytes.
 
 The OpenCut client keeps its existing editor: timeline UI, preview, track controls, and clip interactions. Those actions leave the client as editor commands.
 
@@ -67,4 +70,8 @@ SpacetimeDB is the canonical shared project: projects, tracks, clips, effects, p
 
 OpenCut UI actions should be translated into collaboration commands. Remote commands should be subscribed to and reconciled back into OpenCut's local editor state.
 
-The collaboration layer should own synchronization semantics, presence, conflict policy, and history. It should not own media decoding, rendering, or export.
+The collaboration layer owns synchronization semantics, presence, permissions,
+live sessions, history, and shared media transport. Decoding, rendering, and
+export remain in the editor. Reducers serialize shared edits transactionally;
+the web bridge applies canonical remote snapshots to local tracks. Local
+undo/redo commands publish their resulting track changes through the same bridge.

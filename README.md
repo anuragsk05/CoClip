@@ -1,8 +1,11 @@
-# OpenCut (Legacy)
+# CoClip
 
-This is the original OpenCut codebase. It's archived and no longer maintained.
+CoClip is a hackathon project for collaborative, agentic video editing built on
+the OpenCut web editor. Humans and an AI collaborator edit the same shared
+timeline through SpacetimeDB reducers.
 
-The rewrite is happening at [opencut-app/opencut](https://github.com/opencut-app/opencut).
+See [collaboration](collaboration/README.md) for multiplayer setup and
+[agent UI development](docs/agent-ui-development.md) for local preview instructions.
 
 ## Sponsors
 
@@ -18,7 +21,7 @@ Thanks to [Vercel](https://vercel.com?utm_source=github-opencut&utm_campaign=oss
 
 ## Why?
 
-- **Privacy**: Your videos stay on your device
+- **Local editing**: Projects and media are cached on your device; collaboration shares media with the configured SpacetimeDB instance
 - **Free features**: Most basic CapCut features are now paywalled 
 - **Simple**: People want editors that are easy to use - CapCut proved that
 
@@ -27,6 +30,7 @@ Thanks to [Vercel](https://vercel.com?utm_source=github-opencut&utm_campaign=oss
 - `apps/web/`: Next.js web application
 - `apps/desktop/`: Native desktop app built with GPUI (in progress)
 - `rust/`: Platform-agnostic core: GPU compositor, effects, masks, and WASM bindings. We're actively migrating business logic here from TypeScript.
+- `collaboration/`: Rust SpacetimeDB module, TypeScript client adapter, and AI agent.
 - `docs/`: Architecture and subsystem documentation
 
 ## Getting Started
