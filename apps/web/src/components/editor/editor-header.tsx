@@ -30,6 +30,7 @@ import { AgentPanel } from "@/collaboration/components/agent-panel";
 import { Collaborators } from "@/collaboration/components/collaborators";
 import { ShareLink } from "@/collaboration/components/share-link";
 import { useCollaborationState } from "@/collaboration/collaboration-provider";
+import { tabBuffering } from "@/hooks/use-tab-buffering";
 
 export function EditorHeader() {
 	return (
@@ -73,6 +74,7 @@ function ProjectDropdown() {
 	const handleExit = async () => {
 		if (isExiting) return;
 		setIsExiting(true);
+		tabBuffering.start("exiting-project", "Exiting project...");
 
 		try {
 			await editor.project.prepareExit();

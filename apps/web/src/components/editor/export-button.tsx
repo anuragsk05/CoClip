@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRegisterTabLoading } from "@/hooks/use-tab-buffering";
 import { TransitionTopIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -98,6 +99,12 @@ function ExportPopover({
 	const activeProject = useEditor((e) => e.project.getActive());
 	const exportState = useEditor((e) => e.project.getExportState());
 	const { isExporting, progress, result: exportResult } = exportState;
+
+	useRegisterTabLoading(
+		isExporting,
+		"exporting",
+		`Exporting (${Math.round(progress * 100)}%)...`,
+	);
 	const [format, setFormat] = useState<ExportFormat>(
 		DEFAULT_EXPORT_OPTIONS.format,
 	);

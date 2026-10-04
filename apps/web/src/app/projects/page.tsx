@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEditor } from "@/editor/use-editor";
 import { useProjectsStore } from "./store";
+import { tabBuffering, useRegisterTabLoading } from "@/hooks/use-tab-buffering";
 import type {
 	TProjectMetadata,
 	TProjectSortKey,
@@ -95,6 +96,12 @@ export default function ProjectsPage() {
 	const isInitialized = useEditor((e) => e.project.getIsInitialized());
 	const projectsToDisplay = useEditor((e) =>
 		e.project.getFilteredAndSortedProjects({ searchQuery, sortOption }),
+	);
+
+	useRegisterTabLoading(
+		isLoading && !isInitialized,
+		"loading-projects",
+		"Loading projects...",
 	);
 
 	useEffect(() => {
@@ -509,10 +516,16 @@ function NewProjectButton() {
 	const router = useRouter();
 
 	const handleCreateProject = async () => {
-		const projectId = await editor.project.createNewProject({
-			name: "New project",
-		});
-		router.push(`/editor/${projectId}`);
+		tabBuffering.start("opening-project", "Creating project...");
+		try {
+			const projectId = await editor.project.createNewProject({
+				name: "New project",
+			});
+			router.push(`/editor/${projectId}`);
+		} catch (error) {
+			tabBuffering.stop("opening-project");
+			throw error;
+		}
 	};
 
 	return (
@@ -666,7 +679,13 @@ function ProjectItem({
 				className="size-5 shrink-0"
 			/>
 
-			<Link href={`/editor/${project.id}`} className="flex-1 min-w-0">
+			<Link
+				href={`/editor/${project.id}`}
+				className="flex-1 min-w-0"
+				onClick={() =>
+					tabBuffering.start("opening-project", `Opening ${project.name}...`)
+				}
+			>
 				{listRowContent}
 			</Link>
 
@@ -691,7 +710,16 @@ function ProjectItem({
 					<div className="group relative">
 						{isGridView ? (
 							<>
-								<Link href={`/editor/${project.id}`} className="block">
+								<Link
+									href={`/editor/${project.id}`}
+									className="block"
+									onClick={() =>
+										tabBuffering.start(
+											"opening-project",
+											`Opening ${project.name}...`,
+										)
+									}
+								>
 									{gridContent}
 								</Link>
 
@@ -956,12 +984,14 @@ function EmptyState() {
 	const savedProjects = editor.project.getSavedProjects();
 
 	const handleCreateProject = async () => {
+		tabBuffering.start("opening-project", "Creating project...");
 		try {
 			const projectId = await editor.project.createNewProject({
 				name: "New project",
 			});
 			router.push(`/editor/${projectId}`);
 		} catch (error) {
+			tabBuffering.stop("opening-project");
 			toast.error("Failed to create project", {
 				description:
 					error instanceof Error ? error.message : "Please try again",

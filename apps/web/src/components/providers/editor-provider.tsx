@@ -17,6 +17,7 @@ import {
 	initializeGpuRenderer,
 	isGpuAvailable,
 } from "@/services/renderer/gpu-renderer";
+import { useRegisterTabLoading } from "@/hooks/use-tab-buffering";
 
 interface EditorProviderProps {
 	projectId: string;
@@ -29,6 +30,19 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const { setLoadingProject } = useKeybindingsStore();
+
+	useRegisterTabLoading(isLoading, "editor-loading-project", "Loading project...");
+	useRegisterTabLoading(
+		!activeProject && !isLoading && !error,
+		"editor-exiting",
+		"Exiting project...",
+	);
+
+	useEffect(() => {
+		if (activeProject?.metadata.name) {
+			document.title = `${activeProject.metadata.name} — CoClip`;
+		}
+	}, [activeProject?.metadata.name]);
 
 	useEffect(() => {
 		setLoadingProject(isLoading);
