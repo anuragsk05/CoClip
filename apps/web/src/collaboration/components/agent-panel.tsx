@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+	MAX_CONVERSATION_TURNS,
+	MAX_TURN_CHARS,
+	type ConversationTurn,
+} from "@opencut/collab-agent/conversation";
 import { SparklesIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditor } from "@/editor/use-editor";
+import { mediaTimeToSeconds } from "opencut-wasm";
 import { cn } from "@/utils/ui";
 
 import { useCollaborationState } from "../collaboration-provider";
@@ -32,12 +38,36 @@ interface AgentResponse {
 
 export function AgentPanel() {
 	const { status, canWrite } = useCollaborationState();
-	const projectId = useEditor((editor) => editor.project.getActive().metadata.id);
+	const editor = useEditor();
+	const projectId = useEditor(
+		(editor) => editor.project.getActive().metadata.id,
+	);
+	const activeScene = useEditor((editor) =>
+		editor.scenes.getActiveSceneOrNull(),
+	);
+	const selectedElements = useEditor((editor) =>
+		editor.selection.getSelectedElements(),
+	);
+	const selectedNames = selectedElements
+		.map(({ elementId, trackId }) => {
+			const tracks = activeScene?.tracks;
+			const track =
+				tracks &&
+				[tracks.main, ...tracks.overlay, ...tracks.audio].find(
+					(track) => track.id === trackId,
+				);
+			return track?.elements.find((element) => element.id === elementId)?.name;
+		})
+		.filter((name): name is string => Boolean(name));
 	const [open, setOpen] = useState(false);
 	const [mode, setMode] = useState<Mode>("chat");
 	const [prompt, setPrompt] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [lines, setLines] = useState<ChatLine[]>([]);
+	const memoryRef = useRef<{ projectId: string; turns: ConversationTurn[] }>({
+		projectId,
+		turns: [],
+	});
 	const conversationRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -53,10 +83,32 @@ export function AgentPanel() {
 
 	const submit = async () => {
 		const text = prompt.trim();
-		if (!text || busy) {
+		if (!text || busy || status !== "connected") {
 			return;
 		}
 
+		const scene = editor.scenes.getActiveSceneOrNull();
+		if (!scene) return;
+		const sceneClipIds = new Set(
+			[
+				scene.tracks.main,
+				...scene.tracks.overlay,
+				...scene.tracks.audio,
+			].flatMap((track) => track.elements.map((element) => element.id)),
+		);
+		const context = {
+			sceneId: scene.id,
+			selectedClipIds: editor.selection
+				.getSelectedElements()
+				.map((element) => element.elementId)
+				.filter((id) => sceneClipIds.has(id)),
+			playheadSeconds: mediaTimeToSeconds({
+				time: editor.playback.getCurrentTime(),
+			}),
+		};
+		if (memoryRef.current.projectId !== projectId)
+			memoryRef.current = { projectId, turns: [] };
+		const history = memoryRef.current.turns;
 		setPrompt("");
 		setBusy(true);
 		setLines((current) => [...current, { role: "user", text }]);
@@ -65,7 +117,13 @@ export function AgentPanel() {
 			const response = await fetch("/api/collaboration/agent", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ projectId, prompt: text, mode }),
+				body: JSON.stringify({
+					projectId,
+					prompt: text,
+					mode,
+					context,
+					history,
+				}),
 			});
 			const raw = await response.text();
 			let payload: AgentResponse;
@@ -94,6 +152,24 @@ export function AgentPanel() {
 				return;
 			}
 
+			memoryRef.current = {
+				projectId,
+				turns: [
+					...history,
+					{
+						role: "user" as const,
+						text: `${text}\nContext at that time: scene=${context.sceneId}; selected=${context.selectedClipIds.slice(0, 20).join(",")}`.slice(
+							0,
+							MAX_TURN_CHARS,
+						),
+					},
+					{
+						role: "agent" as const,
+						text:
+							(payload.reply ?? "Done.").slice(0, MAX_TURN_CHARS) || "Done.",
+					},
+				].slice(-MAX_CONVERSATION_TURNS),
+			};
 			const extras =
 				payload.events
 					?.filter((event) => event.type === "tool" && event.name)
@@ -166,7 +242,16 @@ export function AgentPanel() {
 						</div>
 					</ScrollArea>
 				)}
+				{activeScene && (
+					<p className="text-muted-foreground text-xs" aria-live="polite">
+						Scene: {activeScene.name} ·{" "}
+						{selectedNames.length > 0
+							? `Selected: ${selectedNames.length === 1 ? selectedNames[0] : `${selectedNames.length} clips`}`
+							: "No clips selected"}
+					</p>
+				)}
 				<Textarea
+					maxLength={2000}
 					aria-label={mode === "goal" ? "Agent goal" : "Agent prompt"}
 					value={prompt}
 					onChange={(event) => setPrompt(event.target.value)}
@@ -185,7 +270,9 @@ export function AgentPanel() {
 				<Button
 					size="sm"
 					onClick={() => void submit()}
-					disabled={busy || status !== "connected" || prompt.trim().length === 0}
+					disabled={
+						busy || status !== "connected" || prompt.trim().length === 0
+					}
 				>
 					{busy ? "Working…" : mode === "goal" ? "Run goal" : "Send"}
 				</Button>

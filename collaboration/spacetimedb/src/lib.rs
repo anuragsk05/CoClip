@@ -6,6 +6,7 @@
 //! surface — there is no privileged agent API.
 
 mod assets;
+mod chat;
 mod clips;
 mod edit;
 mod effects;

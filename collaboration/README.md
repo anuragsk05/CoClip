@@ -86,3 +86,15 @@ active human editors. Presence includes cursors, selection, playhead, and playba
 The agent prompt UI is compact until a request is submitted; replies and tool
 activity then appear in a conversation that grows up to a scrollable maximum.
 See [local UI testing](../docs/agent-ui-development.md).
+
+## Team chat and agent memory
+
+The web header includes project chat for active collaborators, including viewers.
+Rust `chat.rs` validates writes and retains the latest 200 messages per project,
+without changing edit revisions. Publish the updated module before running the
+updated client. Chat follows the existing public-table read model.
+
+Agent prompts carry up to five recent completed exchanges from the local agent
+panel. Current scene/selection/state take precedence. Team chat is not passed
+to the model. The bundled playbook in `agent/src/instructions.ts` is explicitly
+loaded by the model loop. See [testing instructions](../docs/agent-ui-development.md).

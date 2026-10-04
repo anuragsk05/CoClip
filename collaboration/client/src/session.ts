@@ -31,6 +31,7 @@ import {
 import type { DbConnection } from "./module_bindings";
 import type {
 	Collaborator,
+	ChatMessage,
 	EditorCommand,
 	MemberRole,
 	PresenceUpdate,
@@ -75,6 +76,7 @@ export class CollabSession {
 	#accessListeners = new Set<Listener<boolean>>();
 	#liveListeners = new Set<Listener<boolean>>();
 	#departureListeners = new Set<Listener<SessionDeparture>>();
+	#chatListeners = new Set<Listener<ChatMessage[]>>();
 	#chunkListeners = new Set<Listener<void>>();
 
 	/** Set while remote state is being written into the editor. */
@@ -182,7 +184,8 @@ export class CollabSession {
 	/** True while the host has a CoClip session open for other people. */
 	get sessionLive(): boolean {
 		return (
-			this.#connection.db.liveSession.projectId.find(this.projectId)?.active === true
+			this.#connection.db.liveSession.projectId.find(this.projectId)?.active ===
+			true
 		);
 	}
 
@@ -312,6 +315,33 @@ export class CollabSession {
 	 * Dropped while remote state is being applied: an edit that arrived from
 	 * another editor must not be echoed back as a local one.
 	 */
+	chatMessages(): ChatMessage[] {
+		return this.#rows(this.#connection.db.chatMessage)
+			.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+			.map((row) => ({
+				id: row.id.toString(),
+				author: row.author.toHexString(),
+				authorName: row.authorName,
+				text: row.text,
+				sentAt: row.sentAt.toDate(),
+			}));
+	}
+
+	onChatMessages(listener: Listener<ChatMessage[]>): () => void {
+		this.#chatListeners.add(listener);
+		listener(this.chatMessages());
+		return () => {
+			this.#chatListeners.delete(listener);
+		};
+	}
+
+	async sendChatMessage(text: string): Promise<void> {
+		await this.#connection.reducers.sendChatMessage({
+			projectId: this.projectId,
+			text,
+		});
+	}
+
 	async dispatch(command: EditorCommand): Promise<void> {
 		if (this.#applyingRemote || this.#closed || !this.canWrite) {
 			return;
@@ -620,20 +650,24 @@ export class CollabSession {
 		for (const rows of grouped.values()) {
 			const mine = rows.find((row) => row.connectionId.toHexString() === self);
 			const newest = [...rows].sort(
-				(left, right) => right.lastSeen.toDate().getTime() - left.lastSeen.toDate().getTime(),
+				(left, right) =>
+					right.lastSeen.toDate().getTime() - left.lastSeen.toDate().getTime(),
 			)[0];
 			if (!newest) {
 				continue;
 			}
 			let presence = null;
 			for (const row of rows) {
-				const next = this.#connection.db.presence.connectionId.find(row.connectionId);
+				const next = this.#connection.db.presence.connectionId.find(
+					row.connectionId,
+				);
 				if (!next) {
 					continue;
 				}
 				if (
 					!presence ||
-					next.updatedAt.toDate().getTime() >= presence.updatedAt.toDate().getTime()
+					next.updatedAt.toDate().getTime() >=
+						presence.updatedAt.toDate().getTime()
 				) {
 					presence = next;
 				}
@@ -644,7 +678,8 @@ export class CollabSession {
 				isSelf: mine != null,
 			});
 			person.canWrite = rows.some((row) => row.canWrite);
-			person.atCapacity = !person.canWrite && rows.some((row) => row.atCapacity);
+			person.atCapacity =
+				!person.canWrite && rows.some((row) => row.atCapacity);
 			person.connectionId = (mine ?? newest).connectionId.toHexString();
 			people.push(person);
 		}
@@ -672,7 +707,10 @@ export class CollabSession {
 	 * Only the host may call this. The server refuses a promotion once four
 	 * people already hold an edit seat.
 	 */
-	async setParticipantAccess(connectionId: string, canWrite: boolean): Promise<void> {
+	async setParticipantAccess(
+		connectionId: string,
+		canWrite: boolean,
+	): Promise<void> {
 		if (this.#closed) {
 			throw new Error("session is closed");
 		}
@@ -771,6 +809,7 @@ export class CollabSession {
 		this.#liveListeners.clear();
 		this.#departureListeners.clear();
 		this.#chunkListeners.clear();
+		this.#chatListeners.clear();
 		this.#connection.disconnect();
 	}
 
@@ -792,6 +831,7 @@ export class CollabSession {
 			scoped("share_invite"),
 			scoped("collaborator"),
 			scoped("live_session"),
+			scoped("chat_message"),
 			// Collaborator names and colours are not project-scoped.
 			"SELECT * FROM user",
 		];
@@ -831,6 +871,12 @@ export class CollabSession {
 		this.#watchProjectState();
 		this.#watchPresence();
 		this.#watchHistory();
+		const emitChat = () => {
+			const messages = this.chatMessages();
+			for (const listener of this.#chatListeners) listener(messages);
+		};
+		this.#connection.db.chatMessage.onInsert(emitChat);
+		this.#connection.db.chatMessage.onDelete(emitChat);
 		this.#watchAccess();
 		this.#watchLiveSession();
 		if (this.#includeMediaBytes) {
