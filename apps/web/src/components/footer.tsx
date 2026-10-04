@@ -45,9 +45,9 @@ export function Footer() {
 							<Image
 								src={DEFAULT_LOGO_URL}
 								alt="CoClip"
-								width={28}
-								height={28}
-								className="size-7 rounded-lg"
+								width={1254}
+								height={657}
+								className="h-8 w-auto rounded-md"
 							/>
 							<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground to-primary bg-clip-text text-transparent">
 								CoClip

@@ -62,9 +62,9 @@ export function Header() {
 								<Image
 									src={DEFAULT_LOGO_URL}
 									alt="CoClip"
-									className="size-8 rounded-lg transition-transform group-hover:scale-105"
-									width={32}
-									height={32}
+									width={1254}
+									height={657}
+									className="h-9 w-auto rounded-md transition-transform group-hover:scale-105"
 								/>
 								<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
 									CoClip
