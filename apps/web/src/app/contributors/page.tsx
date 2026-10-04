@@ -34,7 +34,7 @@ async function getContributors(): Promise<Contributor[]> {
 			{
 				headers: {
 					Accept: "application/vnd.github.v3+json",
-					"User-Agent": "OpenCut-Web-App",
+					"User-Agent": "CoClip-Web-App",
 				},
 				next: { revalidate: 600 }, // 10 minutes
 			},
@@ -169,7 +169,7 @@ function AllContributorsSection({
 			<div className="flex flex-col gap-2 text-center">
 				<h2 className="text-2xl font-semibold">All contributors</h2>
 				<p className="text-muted-foreground">
-					Everyone who makes OpenCut better
+					Everyone who makes CoClip better
 				</p>
 			</div>
 
@@ -211,7 +211,7 @@ function ExternalToolsSection() {
 		<div className="flex flex-col gap-10">
 			<div className="flex flex-col gap-2 text-center">
 				<h2 className="text-2xl font-semibold">External tools</h2>
-				<p className="text-muted-foreground">Tools we use to build OpenCut</p>
+				<p className="text-muted-foreground">Tools we use to build CoClip</p>
 			</div>
 
 			<div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2">

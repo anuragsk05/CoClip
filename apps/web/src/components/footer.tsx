@@ -17,6 +17,9 @@ type CategoryLinks = Record<Category, FooterLink[]>;
 
 const links: CategoryLinks = {
 	resources: [
+		{ label: "Multiplayer", href: "/#collaboration" },
+		{ label: "Features", href: "/#features" },
+		{ label: "Workflow", href: "/#how-it-works" },
 		{ label: "Roadmap", href: "/roadmap" },
 		{ label: "Changelog", href: "/changelog" },
 		{ label: "Blog", href: "/blog" },
@@ -39,13 +42,13 @@ export function Footer() {
 					{/* Brand Section */}
 					<div className="max-w-sm md:col-span-1">
 						<div className="mb-4 flex items-center justify-start gap-2.5">
-							<div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
+							<div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary overflow-hidden">
 								<Image
 									src={DEFAULT_LOGO_URL}
 									alt="CoClip"
 									width={20}
 									height={20}
-									className="invert dark:invert-0 size-4"
+									className="size-4.5"
 								/>
 							</div>
 							<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground to-primary bg-clip-text text-transparent">
@@ -53,7 +56,7 @@ export function Footer() {
 							</span>
 						</div>
 						<p className="text-muted-foreground mb-5 text-sm md:text-left">
-							The modern high-performance video editor that gets the job done.
+							The real-time collaborative video editor for modern creators and teams.
 						</p>
 						<div className="flex justify-start gap-3">
 							<Link

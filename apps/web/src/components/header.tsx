@@ -31,16 +31,20 @@ export function Header() {
 
 	const links = [
 		{
+			label: "Multiplayer",
+			href: "/#collaboration",
+		},
+		{
+			label: "Features",
+			href: "/#features",
+		},
+		{
+			label: "Workflow",
+			href: "/#how-it-works",
+		},
+		{
 			label: "Roadmap",
 			href: "/roadmap",
-		},
-		{
-			label: "Contributors",
-			href: "/contributors",
-		},
-		{
-			label: "Sponsors",
-			href: "/sponsors",
 		},
 		{
 			label: "Blog",
@@ -55,11 +59,11 @@ export function Header() {
 					<ContextMenu>
 						<ContextMenuTrigger asChild>
 							<Link href="/" className="flex items-center gap-2.5 group">
-								<div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary transition-transform group-hover:scale-105">
+								<div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary transition-transform group-hover:scale-105 overflow-hidden">
 									<Image
 										src={DEFAULT_LOGO_URL}
 										alt="CoClip Logo"
-										className="invert dark:invert-0 size-4.5"
+										className="size-5"
 										width={24}
 										height={24}
 									/>

@@ -8,11 +8,11 @@ import type { Post } from "@/blog/types";
 export const metadata: Metadata = {
 	title: "Blog - CoClip",
 	description:
-		"Read the latest news and updates about CoClip, the modern video editor.",
+		"Read the latest news and updates about CoClip, the real-time collaborative video editor.",
 	openGraph: {
 		title: "Blog - CoClip",
 		description:
-			"Read the latest news and updates about CoClip, the modern video editor.",
+			"Read the latest news and updates about CoClip, the real-time collaborative video editor.",
 		type: "website",
 	},
 };
@@ -24,7 +24,7 @@ export default async function BlogPage() {
 	return (
 		<BasePage
 			title="Blog"
-			description="Read the latest news and updates about CoClip, the modern video editor."
+			description="Read the latest news and updates about CoClip, the real-time collaborative video editor."
 		>
 			<div className="flex flex-col">
 				{data.posts.map((post) => (

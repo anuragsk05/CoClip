@@ -51,7 +51,7 @@ const roadmapItems: RoadmapItem[] = [
 	{
 		title: "Native app (mobile/desktop)",
 		description:
-			"Native OpenCut apps for Mac, Windows, Linux, and iOS/Android.",
+			"Native CoClip apps for Mac, Windows, Linux, and iOS/Android.",
 		status: {
 			text: "Not started",
 			type: "default",
@@ -60,28 +60,28 @@ const roadmapItems: RoadmapItem[] = [
 ];
 
 export const metadata: Metadata = {
-	title: "Roadmap - OpenCut",
+	title: "Roadmap - CoClip",
 	description:
-		"See what's coming next for OpenCut - the free, open-source video editor that respects your privacy.",
+		"See what's coming next for CoClip - the real-time collaborative video editor.",
 	openGraph: {
-		title: "OpenCut Roadmap - What's Coming Next",
+		title: "CoClip Roadmap - What's Coming Next",
 		description:
-			"See what's coming next for OpenCut - the free, open-source video editor that respects your privacy.",
+			"See what's coming next for CoClip - the real-time collaborative video editor.",
 		type: "website",
 		images: [
 			{
 				url: "/open-graph/roadmap.jpg",
 				width: 1200,
 				height: 630,
-				alt: "OpenCut Roadmap",
+				alt: "CoClip Roadmap",
 			},
 		],
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: "OpenCut Roadmap - What's Coming Next",
+		title: "CoClip Roadmap - What's Coming Next",
 		description:
-			"See what's coming next for OpenCut - the free, open-source video editor that respects your privacy.",
+			"See what's coming next for CoClip - the real-time collaborative video editor.",
 		images: ["/open-graph/roadmap.jpg"],
 	},
 };
@@ -90,7 +90,7 @@ export default function RoadmapPage() {
 	return (
 		<BasePage
 			title="Roadmap"
-			description={`What's coming next for OpenCut (last updated: ${LAST_UPDATED})`}
+			description={`What's coming next for CoClip (last updated: ${LAST_UPDATED})`}
 		>
 			<div className="mx-auto flex max-w-4xl flex-col gap-16">
 				<div className="flex flex-col gap-6">

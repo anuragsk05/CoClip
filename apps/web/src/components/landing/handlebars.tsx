@@ -144,10 +144,10 @@ export function Handlebars({ children }: HandlebarsProps) {
 				className="relative mt-0.5"
 				style={{ transform: `rotate(-${HANDLEBARS_ROTATE_DEG}deg)` }}
 			>
-				<div className="absolute inset-0 z-10 flex size-full justify-between rounded-2xl border border-yellow-500">
+				<div className="absolute inset-0 z-10 flex size-full justify-between rounded-2xl border border-primary/80 shadow-xs shadow-primary/20">
 					<div
 						ref={leftHandleRef}
-						className="bg-background absolute left-0 z-20 flex h-full w-7 cursor-ew-resize touch-none items-center justify-center rounded-full border border-yellow-500 select-none"
+						className="bg-background absolute left-0 z-20 flex h-full w-7 cursor-ew-resize touch-none items-center justify-center rounded-full border border-primary shadow-xs select-none"
 						style={{
 							translate: `${leftHandle}px 0`,
 						}}
@@ -161,12 +161,12 @@ export function Handlebars({ children }: HandlebarsProps) {
 							dragRef.current.initialPosition = leftHandlePositionRef.current;
 						}}
 					>
-						<div className="h-8 w-2 rounded-full bg-yellow-500" />
+						<div className="h-8 w-2 rounded-full bg-primary" />
 					</div>
 
 					<div
 						ref={rightHandleRef}
-						className="bg-background absolute z-20 flex h-full w-7 cursor-ew-resize touch-none items-center justify-center rounded-full border border-yellow-500 select-none"
+						className="bg-background absolute z-20 flex h-full w-7 cursor-ew-resize touch-none items-center justify-center rounded-full border border-primary shadow-xs select-none"
 						style={{
 							left: hasMeasuredWidth
 								? `${RIGHT_HANDLE_LEFT_OFFSET_PX}px`
@@ -184,7 +184,7 @@ export function Handlebars({ children }: HandlebarsProps) {
 							dragRef.current.initialPosition = rightHandlePositionRef.current;
 						}}
 					>
-						<div className="h-8 w-2 rounded-full bg-yellow-500" />
+						<div className="h-8 w-2 rounded-full bg-primary" />
 					</div>
 				</div>
 

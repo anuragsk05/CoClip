@@ -1,13 +1,13 @@
 export const SITE_URL = "https://coclip.app";
 
 export const SITE_INFO = {
-	title: "CoClip",
+	title: "CoClip — Real-Time Collaborative Video Editor",
 	description:
-		"A modern and powerful video editor that gets the job done. In your browser.",
+		"The real-time collaborative video editor in your browser. Multi-track timelines, multiplayer presence, deterministic state sync, and AI collaboration.",
 	url: SITE_URL,
 	openGraphImage: "/open-graph/default.jpg",
 	twitterImage: "/open-graph/default.jpg",
 	favicon: "/favicon.ico",
 };
 
-export const DEFAULT_LOGO_URL = "/logos/opencut/svg/logo.svg";
+export const DEFAULT_LOGO_URL = "/logos/coclip/logo.svg";

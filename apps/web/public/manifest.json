@@ -1,6 +1,6 @@
 {
-	"name": "OpenCut",
-	"description": "A simple but powerful video editor that gets the job done. In your browser.",
+	"name": "CoClip",
+	"description": "The real-time collaborative video editor in your browser.",
 	"display": "standalone",
 	"start_url": "/",
 	"icons": [
