@@ -11,24 +11,23 @@ import {
 } from "spacetimedb";
 import {
   ActorKind,
-  EditOp,
+  MemberRole,
 } from "./types";
 
 
 export default __t.row({
-  id: __t.u64().primaryKey(),
+  connectionId: __t.connectionId().primaryKey().name("connection_id"),
   projectId: __t.string().name("project_id"),
-  revision: __t.u64(),
-  get op() {
-    return EditOp;
+  identity: __t.identity(),
+  displayName: __t.string().name("display_name"),
+  color: __t.string(),
+  get kind() {
+    return ActorKind;
   },
-  targetId: __t.string().name("target_id"),
-  actor: __t.identity(),
-  get actorKind() {
-    return ActorKind.name("actor_kind");
+  get role() {
+    return MemberRole;
   },
-  origin: __t.option(__t.connectionId()),
-  summary: __t.string(),
-  payload: __t.string(),
-  at: __t.timestamp(),
+  canWrite: __t.bool().name("can_write"),
+  atCapacity: __t.bool().name("at_capacity"),
+  lastSeen: __t.timestamp().name("last_seen"),
 });

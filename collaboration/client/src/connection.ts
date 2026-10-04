@@ -8,7 +8,9 @@ import { DbConnection } from "./module_bindings";
  * Where to keep the auth token between sessions.
  *
  * Reusing the token is what makes a returning editor the same `Identity`, and
- * therefore the same collaborator, rather than a new anonymous one.
+ * therefore the same person. The host address is only where the socket connects.
+ * It is never a stand-in for who someone is, so two people on one network stay
+ * two people. One browser holds one token, so two tabs there are one person.
  */
 export interface TokenStore {
 	get(): string | undefined;
@@ -26,18 +28,48 @@ export interface ConnectOptions {
 
 const TOKEN_KEY = "opencut.collab.token";
 
-export function browserTokenStore(): TokenStore {
+function tokenKey(uri: string): string {
+	return `${TOKEN_KEY}:${uri}`;
+}
+
+function isLoopbackUri(uri: string): boolean {
+	try {
+		const hostname = new URL(uri).hostname;
+		return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * The saved login is per database host.
+ *
+ * A token from the local server is not a Maincloud login. Reusing it would
+ * make this browser fail to connect, or show up as the wrong person.
+ */
+export function browserTokenStore(uri = ""): TokenStore {
+	const key = uri ? tokenKey(uri) : TOKEN_KEY;
 	return {
 		get: () => {
 			try {
-				return globalThis.localStorage?.getItem(TOKEN_KEY) ?? undefined;
+				const scoped = globalThis.localStorage?.getItem(key);
+				if (scoped) {
+					return scoped;
+				}
+				if (!uri || isLoopbackUri(uri)) {
+					return globalThis.localStorage?.getItem(TOKEN_KEY) ?? undefined;
+				}
+				return undefined;
 			} catch {
 				return undefined;
 			}
 		},
 		set: (token) => {
 			try {
-				globalThis.localStorage?.setItem(TOKEN_KEY, token);
+				globalThis.localStorage?.setItem(key, token);
+				if (!uri || isLoopbackUri(uri)) {
+					globalThis.localStorage?.setItem(TOKEN_KEY, token);
+				}
 			} catch {
 				// A blocked storage API is not a reason to refuse to collaborate;
 				// the session simply starts as a new identity next time.
@@ -57,7 +89,7 @@ export function memoryTokenStore(): TokenStore {
 }
 
 export function connect(options: ConnectOptions): Promise<DbConnection> {
-	const tokenStore = options.tokenStore ?? browserTokenStore();
+	const tokenStore = options.tokenStore ?? browserTokenStore(options.uri);
 
 	return new Promise((resolve, reject) => {
 		let settled = false;

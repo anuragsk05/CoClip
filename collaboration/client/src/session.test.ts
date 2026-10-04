@@ -7,9 +7,10 @@
 
 import { afterAll, expect, test } from "bun:test";
 
-import { memoryTokenStore } from "./connection";
+import { memoryTokenStore, type TokenStore } from "./connection";
+import { assembleMediaChunks } from "./media-bytes";
 import { CollabSession } from "./session";
-import type { NewClip, ProjectSnapshot, RemoteEdit } from "./types";
+import type { Collaborator, NewClip, ProjectSnapshot, RemoteEdit } from "./types";
 
 const URI = process.env.SPACETIME_URI ?? "ws://localhost:3000";
 const DATABASE = process.env.SPACETIME_DATABASE ?? "opencut-collab";
@@ -29,6 +30,8 @@ async function openSession(options: {
 	projectId: string;
 	name: string;
 	asAgent?: boolean;
+	inviteToken?: string;
+	tokenStore?: TokenStore;
 }): Promise<CollabSession> {
 	const session = await CollabSession.open({
 		uri: URI,
@@ -36,12 +39,59 @@ async function openSession(options: {
 		projectId: options.projectId,
 		// A fresh token per session makes each one a distinct collaborator,
 		// which is what two people in two browsers actually look like.
-		tokenStore: memoryTokenStore(),
+		tokenStore: options.tokenStore ?? memoryTokenStore(),
 		profile: { name: options.name, color: "#f97316" },
 		asAgent: options.asAgent,
+		inviteToken: options.inviteToken,
 	});
 	opened.push(session);
 	return session;
+}
+
+function waitForAccess(session: CollabSession, canWrite: boolean): Promise<void> {
+	if (session.canWrite === canWrite) {
+		return Promise.resolve();
+	}
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			stop();
+			reject(new Error(`timed out waiting for canWrite=${canWrite}`));
+		}, 3000);
+		const stop = session.onWriteAccess((next) => {
+			if (next !== canWrite) {
+				return;
+			}
+			clearTimeout(timeout);
+			stop();
+			resolve();
+		});
+	});
+}
+
+function waitForCollaborator(
+	session: CollabSession,
+	predicate: (collaborator: Collaborator) => boolean,
+): Promise<Collaborator> {
+	return new Promise((resolve, reject) => {
+		const existing = session.collaborators().find(predicate);
+		if (existing) {
+			resolve(existing);
+			return;
+		}
+		const timeout = setTimeout(() => {
+			stop();
+			reject(new Error("timed out waiting for a collaborator"));
+		}, 3000);
+		const stop = session.onCollaborators((collaborators) => {
+			const found = collaborators.find(predicate);
+			if (!found) {
+				return;
+			}
+			clearTimeout(timeout);
+			stop();
+			resolve(found);
+		});
+	});
 }
 
 /** Resolves once a snapshot satisfies `predicate`, or rejects on timeout. */
@@ -108,6 +158,7 @@ test("mirrors a clip move between two editors", async () => {
 		metadata: null,
 	});
 
+	await editorA.startLiveSession();
 	const editorB = await openSession({ projectId, name: "Editor B" });
 	await waitForSnapshot(
 		editorB,
@@ -156,7 +207,12 @@ test("applies a split from one editor in the other", async () => {
 		clip: newClip({ id: clipA, trackId, startTime: 0, duration: seconds(4) }),
 	});
 
-	const editorB = await openSession({ projectId, name: "Editor B" });
+	await editorA.startLiveSession();
+	const editorB = await openSession({
+		projectId,
+		name: "Editor B",
+		inviteToken: await editorA.ensureShareInvite(true),
+	});
 	await waitForSnapshot(
 		editorB,
 		(snapshot) => snapshot.clips.length === 1,
@@ -263,6 +319,504 @@ test("reports an agent's edits as agent-authored history", async () => {
 	expect(addClip?.actorKind).toBe("agent");
 	expect(addClip?.isRemote).toBe(true);
 	expect(addClip?.summary).toBe("Added `B-roll`");
+});
+
+test("a view-only invite cannot change the timeline", async () => {
+	const projectId = `test-view-${crypto.randomUUID()}`;
+	const trackId = `${projectId}-main`;
+	const clipA = `${projectId}-clip-a`;
+
+	const owner = await openSession({ projectId, name: "Owner" });
+	await owner.createProject({
+		name: "View Test",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: trackId,
+		metadata: null,
+	});
+	await owner.dispatch({
+		kind: "addClip",
+		clip: newClip({ id: clipA, trackId, name: "Locked" }),
+	});
+
+	await owner.startLiveSession();
+	const viewer = await openSession({
+		projectId,
+		name: "Viewer",
+		inviteToken: await owner.ensureShareInvite(false),
+	});
+	await waitForSnapshot(
+		viewer,
+		(snapshot) => snapshot.clips.length === 1,
+		"the viewer to see the clip",
+	);
+
+	expect(viewer.role).toBe("viewer");
+	expect(viewer.canWrite).toBe(false);
+
+	const before = owner.snapshot().revision;
+	await viewer.dispatch({
+		kind: "moveClip",
+		clipId: clipA,
+		targetTrackId: trackId,
+		startTime: seconds(3),
+	});
+	expect(owner.snapshot().revision).toBe(before);
+	expect(clipOf(owner.snapshot(), clipA)?.startTime).toBe(0);
+
+	const editor = await openSession({
+		projectId,
+		name: "Editor",
+		inviteToken: await owner.ensureShareInvite(true),
+	});
+	expect(editor.canWrite).toBe(true);
+	expect(editor.role).toBe("editor");
+});
+
+test("a view link stays view-only for the project owner", async () => {
+	const projectId = `test-owner-view-${crypto.randomUUID()}`;
+	const trackId = `${projectId}-main`;
+	const clipA = `${projectId}-clip-a`;
+	const identity = memoryTokenStore();
+
+	const owner = await openSession({
+		projectId,
+		name: "Owner",
+		tokenStore: identity,
+	});
+	await owner.createProject({
+		name: "Owner View Test",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: trackId,
+		metadata: null,
+	});
+	await owner.dispatch({
+		kind: "addClip",
+		clip: newClip({ id: clipA, trackId, name: "Locked" }),
+	});
+
+	const viewing = await openSession({
+		projectId,
+		name: "Owner",
+		tokenStore: identity,
+		inviteToken: await owner.ensureShareInvite(false),
+	});
+	await waitForSnapshot(
+		viewing,
+		(snapshot) => snapshot.clips.length === 1,
+		"the view link to see the clip",
+	);
+
+	expect(viewing.role).toBe("owner");
+	expect(viewing.canWrite).toBe(false);
+
+	const before = owner.snapshot().revision;
+	await viewing.dispatch({
+		kind: "moveClip",
+		clipId: clipA,
+		targetTrackId: trackId,
+		startTime: seconds(3),
+	});
+	expect(owner.snapshot().revision).toBe(before);
+	expect(clipOf(owner.snapshot(), clipA)?.startTime).toBe(0);
+
+	const editing = await openSession({
+		projectId,
+		name: "Owner",
+		tokenStore: identity,
+		inviteToken: await owner.ensureShareInvite(true),
+	});
+	expect(editing.canWrite).toBe(true);
+	await editing.dispatch({
+		kind: "moveClip",
+		clipId: clipA,
+		targetTrackId: trackId,
+		startTime: seconds(2),
+	});
+	await waitForSnapshot(
+		owner,
+		(snapshot) => clipOf(snapshot, clipA)?.startTime === seconds(2),
+		"the edit link to move the clip",
+	);
+});
+
+test("two windows of one browser are one participant", async () => {
+	const projectId = `test-names-${crypto.randomUUID()}`;
+	const identity = memoryTokenStore();
+
+	const ada = await openSession({
+		projectId,
+		name: "Ada",
+		tokenStore: identity,
+	});
+	await ada.createProject({
+		name: "Names",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	ada.publishPresence({
+		sceneId: `${projectId}-scene`,
+		playhead: 0,
+		selection: [],
+		isPlaying: false,
+		cursor: { x: 0.2, y: 0.2 },
+	});
+
+	const kai = await openSession({
+		projectId,
+		name: "Kai",
+		tokenStore: identity,
+		inviteToken: await ada.ensureShareInvite(false),
+	});
+	kai.publishPresence({
+		sceneId: `${projectId}-scene`,
+		playhead: 0,
+		selection: [],
+		isPlaying: false,
+		cursor: { x: 0.8, y: 0.8 },
+	});
+
+	// Both windows share one saved identity, so they are one person. A second
+	// browser is required to show up as someone else.
+	await ada.startLiveSession();
+	const guest = await openSession({
+		projectId,
+		name: "Guest",
+		inviteToken: await ada.ensureShareInvite(false),
+	});
+	const shared = await waitForCollaborator(
+		guest,
+		(collaborator) => collaborator.identity === ada.identity,
+	);
+	const names = guest
+		.collaborators()
+		.filter((collaborator) => collaborator.identity === ada.identity);
+	expect(names).toHaveLength(1);
+	expect(shared.color).not.toBe(
+		guest.collaborators().find((collaborator) => collaborator.isSelf)?.color,
+	);
+	expect(kai.identity).toBe(ada.identity);
+});
+
+test("an editor can switch a window between edit and view", async () => {
+	const projectId = `test-access-${crypto.randomUUID()}`;
+	const owner = await openSession({ projectId, name: "Owner" });
+	await owner.createProject({
+		name: "Access",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	const clipId = `${projectId}-clip`;
+	const trackId = `${projectId}-main`;
+	await owner.dispatch({
+		kind: "addClip",
+		clip: newClip({ id: clipId, trackId }),
+	});
+
+	await owner.startLiveSession();
+	const guest = await openSession({
+		projectId,
+		name: "Guest",
+		inviteToken: await owner.ensureShareInvite(true),
+	});
+	expect(guest.canWrite).toBe(true);
+	const guestRow = await waitForCollaborator(
+		owner,
+		(collaborator) => collaborator.name === "Guest",
+	);
+
+	await owner.setParticipantAccess(guest.connectionId, false);
+	await waitForAccess(guest, false);
+	expect(guest.canWrite).toBe(false);
+
+	const before = owner.snapshot().revision;
+	await guest.dispatch({
+		kind: "moveClip",
+		clipId,
+		targetTrackId: trackId,
+		startTime: seconds(3),
+	});
+	expect(owner.snapshot().revision).toBe(before);
+
+	await owner.setParticipantAccess(guestRow.connectionId, true);
+	await waitForAccess(guest, true);
+	expect(guest.canWrite).toBe(true);
+	await guest.dispatch({
+		kind: "moveClip",
+		clipId,
+		targetTrackId: trackId,
+		startTime: seconds(1),
+	});
+	await waitForSnapshot(
+		owner,
+		(snapshot) => clipOf(snapshot, clipId)?.startTime === seconds(1),
+		"the restored editor to move the clip",
+	);
+});
+
+test("a full session refuses another editor from the participant list", async () => {
+	const projectId = `test-promote-${crypto.randomUUID()}`;
+	const owner = await openSession({ projectId, name: "Owner" });
+	await owner.createProject({
+		name: "Promote",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	await owner.startLiveSession();
+	const writeToken = await owner.ensureShareInvite(true);
+	for (const name of ["One", "Two", "Three"]) {
+		const editor = await openSession({ projectId, name, inviteToken: writeToken });
+		expect(editor.canWrite).toBe(true);
+	}
+	const viewer = await openSession({
+		projectId,
+		name: "Watcher",
+		inviteToken: await owner.ensureShareInvite(false),
+	});
+	expect(viewer.canWrite).toBe(false);
+	await expect(viewer.setParticipantAccess(owner.connectionId, false)).rejects.toThrow();
+
+	const watcher = await waitForCollaborator(
+		owner,
+		(collaborator) => collaborator.name === "Watcher",
+	);
+	await expect(
+		owner.setParticipantAccess(watcher.connectionId, true),
+	).rejects.toThrow(/4 editors/);
+	expect(viewer.canWrite).toBe(false);
+});
+
+test("a fifth editor joins as view-only", async () => {
+	const projectId = `test-cap-${crypto.randomUUID()}`;
+	const owner = await openSession({ projectId, name: "Owner" });
+	await owner.createProject({
+		name: "Cap",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	await owner.startLiveSession();
+	const writeToken = await owner.ensureShareInvite(true);
+
+	const editors = [];
+	for (const name of ["One", "Two", "Three"]) {
+		const editor = await openSession({
+			projectId,
+			name,
+			inviteToken: writeToken,
+		});
+		expect(editor.canWrite).toBe(true);
+		expect(editor.atCapacity).toBe(false);
+		editor.publishPresence({
+			sceneId: `${projectId}-scene`,
+			playhead: 0,
+			selection: [],
+			isPlaying: false,
+			cursor: { x: 0.3, y: 0.3 },
+		});
+		editors.push(editor);
+	}
+
+	const colors = new Set<string>();
+	for (const name of ["One", "Two", "Three"]) {
+		const person = await waitForCollaborator(
+			owner,
+			(collaborator) => collaborator.name === name,
+		);
+		colors.add(person.color);
+	}
+	expect(colors.size).toBe(3);
+
+	const blocked = await openSession({
+		projectId,
+		name: "Four",
+		inviteToken: writeToken,
+	});
+	expect(blocked.canWrite).toBe(false);
+	expect(blocked.atCapacity).toBe(true);
+
+	editors[0]?.close();
+	await new Promise((resolve) => setTimeout(resolve, 150));
+
+	const next = await openSession({
+		projectId,
+		name: "Five",
+		inviteToken: writeToken,
+	});
+	expect(next.canWrite).toBe(true);
+	expect(next.atCapacity).toBe(false);
+});
+
+test("the host starts a session, removes a guest, and can stop it", async () => {
+	const projectId = `test-live-${crypto.randomUUID()}`;
+	const owner = await openSession({ projectId, name: "Host" });
+	await owner.createProject({
+		name: "Live",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	const token = await owner.ensureShareInvite(true);
+	await expect(
+		openSession({ projectId, name: "Early", inviteToken: token }),
+	).rejects.toThrow(/has not started/);
+
+	await owner.startLiveSession();
+	expect(owner.sessionLive).toBe(true);
+	expect(owner.isHost).toBe(true);
+	expect(owner.collaborators().find((person) => person.isSelf)?.role).toBe("owner");
+
+	const guest = await openSession({
+		projectId,
+		name: "Guest",
+		inviteToken: token,
+	});
+	expect(guest.isHost).toBe(false);
+	await waitForCollaborator(owner, (person) => person.name === "Guest");
+	await expect(guest.startLiveSession()).rejects.toThrow(/only the host/);
+
+	await owner.removeParticipant(guest.identity);
+	await waitForAccess(guest, false);
+	expect(owner.collaborators().some((person) => person.name === "Guest")).toBe(false);
+
+	const rejoined = await openSession({
+		projectId,
+		name: "Guest",
+		inviteToken: token,
+	});
+	await waitForCollaborator(owner, (person) => person.identity === rejoined.identity);
+
+	await owner.stopLiveSession();
+	expect(owner.sessionLive).toBe(false);
+	expect(owner.canWrite).toBe(true);
+	expect(owner.collaborators().some((person) => person.identity === rejoined.identity)).toBe(
+		false,
+	);
+	await expect(
+		openSession({ projectId, name: "Late", inviteToken: token }),
+	).rejects.toThrow(/has not started/);
+});
+
+test("a guest can leave a live session", async () => {
+	const projectId = `test-leave-${crypto.randomUUID()}`;
+	const owner = await openSession({ projectId, name: "Host" });
+	await owner.createProject({
+		name: "Leave",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	await owner.startLiveSession();
+	const token = await owner.ensureShareInvite(true);
+	const guest = await openSession({
+		projectId,
+		name: "Guest",
+		inviteToken: token,
+	});
+	await waitForCollaborator(owner, (person) => person.name === "Guest");
+	await expect(owner.leaveSession()).rejects.toThrow(/stops a session/);
+
+	const left = new Promise<string>((resolve) => {
+		guest.onDeparture(resolve);
+	});
+	await guest.leaveSession();
+	expect(await left).toBe("left");
+	expect(guest.canWrite).toBe(false);
+	await new Promise<void>((resolve, reject) => {
+		if (!owner.collaborators().some((person) => person.name === "Guest")) {
+			resolve();
+			return;
+		}
+		const timeout = setTimeout(() => {
+			stop();
+			reject(new Error("the guest was still listed after leaving"));
+		}, 3000);
+		const stop = owner.onCollaborators((people) => {
+			if (people.some((person) => person.name === "Guest")) {
+				return;
+			}
+			clearTimeout(timeout);
+			stop();
+			resolve();
+		});
+	});
+	expect(owner.canWrite).toBe(true);
+	expect(owner.sessionLive).toBe(true);
+});
+
+test("video and audio bytes reach the other editor", async () => {
+	const projectId = `test-media-${crypto.randomUUID()}`;
+	const owner = await openSession({ projectId, name: "Host" });
+	await owner.createProject({
+		name: "Media",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	await owner.startLiveSession();
+	const token = await owner.ensureShareInvite(true);
+	const assetId = `${projectId}-tone`;
+	const payload = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+	await owner.dispatch({
+		kind: "registerAsset",
+		asset: {
+			id: assetId,
+			name: "tone.wav",
+			storage: "spacetime",
+			location: "chunks",
+			mimeType: "audio/wav",
+			byteSize: payload.byteLength,
+			width: null,
+			height: null,
+			duration: null,
+		},
+	});
+	await owner.putAssetChunk({
+		assetId,
+		chunkIndex: 0,
+		chunkCount: 2,
+		bytes: payload.slice(0, 4),
+	});
+
+	const guest = await openSession({
+		projectId,
+		name: "Guest",
+		inviteToken: token,
+	});
+	expect(guest.assetChunks(assetId)).toHaveLength(1);
+
+	await owner.putAssetChunk({
+		assetId,
+		chunkIndex: 1,
+		chunkCount: 2,
+		bytes: payload.slice(4),
+	});
+	await new Promise<void>((resolve, reject) => {
+		if (assembleMediaChunks(guest.assetChunks(assetId))?.byteLength === payload.byteLength) {
+			resolve();
+			return;
+		}
+		const timeout = setTimeout(() => {
+			stop();
+			reject(new Error("the shared file did not arrive"));
+		}, 3000);
+		const stop = guest.onAssetChunks(() => {
+			const file = assembleMediaChunks(guest.assetChunks(assetId));
+			if (file?.byteLength !== payload.byteLength) {
+				return;
+			}
+			clearTimeout(timeout);
+			stop();
+			resolve();
+		});
+	});
+
+	expect(Array.from(assembleMediaChunks(guest.assetChunks(assetId)) ?? [])).toEqual(
+		Array.from(payload),
+	);
 });
 
 test("rejects a clip placed on an incompatible track", async () => {

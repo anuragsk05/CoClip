@@ -21,6 +21,11 @@ const DISCONNECTED: CollaborationState = {
 	recentEdits: [],
 	error: null,
 	session: null,
+	canWrite: true,
+	atCapacity: false,
+	isHost: false,
+	sessionLive: false,
+	departure: null,
 };
 
 const CollaborationContext = createContext<CollaborationState>(DISCONNECTED);

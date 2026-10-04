@@ -12,6 +12,8 @@ import {
 
 export default {
   projectId: __t.string(),
-  inviteToken: __t.string(),
-  displayName: __t.string(),
+  assetId: __t.string(),
+  chunkIndex: __t.u32(),
+  chunkCount: __t.u32(),
+  bytes: __t.byteArray(),
 };

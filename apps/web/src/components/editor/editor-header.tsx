@@ -29,7 +29,6 @@ import { cn } from "@/utils/ui";
 import { AgentPanel } from "@/collaboration/components/agent-panel";
 import { Collaborators } from "@/collaboration/components/collaborators";
 import { ShareLink } from "@/collaboration/components/share-link";
-import { useCollaborationState } from "@/collaboration/collaboration-provider";
 import { tabBuffering } from "@/hooks/use-tab-buffering";
 
 export function EditorHeader() {
@@ -52,14 +51,7 @@ export function EditorHeader() {
 }
 
 function CollaboratorsIndicator() {
-	const { collaborators, status } = useCollaborationState();
-	return (
-		<Collaborators
-			collaborators={collaborators}
-			status={status}
-			className="mr-1"
-		/>
-	);
+	return <Collaborators className="mr-1" />;
 }
 
 function ProjectDropdown() {

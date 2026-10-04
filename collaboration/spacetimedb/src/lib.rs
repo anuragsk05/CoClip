@@ -18,7 +18,7 @@ use spacetimedb::{ReducerContext, Table};
 
 // The generated table accessor traits share their names with this module's
 // submodules, so they are aliased here and used only for their methods.
-use schema::{User, presence as presence_table, user};
+use schema::{User, collaborator, presence as presence_table, user};
 
 #[spacetimedb::reducer(init)]
 pub fn init(_ctx: &ReducerContext) {
@@ -40,6 +40,7 @@ pub fn client_connected(ctx: &ReducerContext) {
 pub fn client_disconnected(ctx: &ReducerContext) {
     if let Some(connection_id) = ctx.connection_id() {
         ctx.db.presence().connection_id().delete(connection_id);
+        ctx.db.collaborator().connection_id().delete(connection_id);
     }
 
     // A user may have several editors open, so they only go offline once the

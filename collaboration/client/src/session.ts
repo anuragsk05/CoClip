@@ -8,10 +8,12 @@
  */
 
 import { connect, type ConnectOptions } from "./connection";
+import type { MediaChunk } from "./media-bytes";
 import {
 	assetStorageToRow,
 	clipKindToRow,
 	fromTicks,
+	lower,
 	projectRevision,
 	retainSideToRow,
 	stringifyJson,
@@ -30,6 +32,7 @@ import type { DbConnection } from "./module_bindings";
 import type {
 	Collaborator,
 	EditorCommand,
+	MemberRole,
 	PresenceUpdate,
 	ProjectSnapshot,
 	RemoteEdit,
@@ -41,6 +44,8 @@ export interface SessionOptions extends ConnectOptions {
 	profile?: { name: string; color: string };
 	/** Marks this session as an AI agent in presence and edit history. */
 	asAgent?: boolean;
+	/** Share-invite token from the live link. Empty or omitted is view-only. */
+	inviteToken?: string;
 }
 
 export interface SnapshotChange {
@@ -53,6 +58,8 @@ type Listener<T> = (value: T) => void;
 
 const PROJECT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
+export type SessionDeparture = "removed" | "ended" | "left";
+
 export class CollabSession {
 	readonly projectId: string;
 
@@ -60,6 +67,10 @@ export class CollabSession {
 	#snapshotListeners = new Set<Listener<SnapshotChange>>();
 	#editListeners = new Set<Listener<RemoteEdit>>();
 	#collaboratorListeners = new Set<Listener<Collaborator[]>>();
+	#accessListeners = new Set<Listener<boolean>>();
+	#liveListeners = new Set<Listener<boolean>>();
+	#departureListeners = new Set<Listener<SessionDeparture>>();
+	#chunkListeners = new Set<Listener<void>>();
 
 	/** Set while remote state is being written into the editor. */
 	#applyingRemote = false;
@@ -69,6 +80,13 @@ export class CollabSession {
 	/** Revision already present when this session subscribed. */
 	#baselineRevision = 0;
 	#closed = false;
+	#inviteToken = "";
+	#displayName = "";
+	/** True after this connection has joined the project. */
+	#joined = false;
+	#departure: SessionDeparture | null = null;
+	/** Set before `leave_session` so a deleted row is not reported as a removal. */
+	#leftVoluntarily = false;
 
 	private constructor(connection: DbConnection, projectId: string) {
 		this.#connection = connection;
@@ -82,6 +100,8 @@ export class CollabSession {
 
 		const connection = await connect(options);
 		const session = new CollabSession(connection, options.projectId);
+		session.#inviteToken = options.inviteToken ?? "";
+		session.#displayName = options.profile?.name?.trim() ?? "";
 
 		if (options.asAgent) {
 			await connection.reducers.declareAgent({
@@ -109,6 +129,171 @@ export class CollabSession {
 		return this.#project() != null;
 	}
 
+	/** This connection's role on the project, if membership has been granted. */
+	get role(): MemberRole | null {
+		const identity = this.identity;
+		if (!identity) {
+			return null;
+		}
+		const member = this.#rows(this.#connection.db.projectMember).find(
+			(row) => row.identity.toHexString() === identity,
+		);
+		return member ? lower<MemberRole>(member.role.tag) : null;
+	}
+
+	/**
+	 * Whether this window may change the timeline.
+	 *
+	 * A view-only link is false even when this person is an editor elsewhere.
+	 * Until the server row arrives, a share link stays view-only.
+	 */
+	get canWrite(): boolean {
+		if (this.#departure) {
+			return false;
+		}
+		const access = this.#ownAccess();
+		if (access) {
+			return access.canWrite;
+		}
+		if (this.#joined && !this.isHost && !this.sessionLive) {
+			return false;
+		}
+		return this.#inviteToken.length === 0;
+	}
+
+	/** True when this identity owns the project. */
+	get isHost(): boolean {
+		const owner = this.#project()?.owner.toHexString();
+		return owner != null && owner !== "" && owner === this.identity;
+	}
+
+	/** True while the host has a CoClip session open for other people. */
+	get sessionLive(): boolean {
+		return (
+			this.#connection.db.liveSession.projectId.find(this.projectId)?.active === true
+		);
+	}
+
+	get departure(): SessionDeparture | null {
+		return this.#departure;
+	}
+
+	/** True when a write link was turned into view-only because four editors are in. */
+	get atCapacity(): boolean {
+		return this.#ownAccess()?.atCapacity === true;
+	}
+
+	/**
+	 * Reuses an existing invite for this access level, or publishes a new one.
+	 *
+	 * The token is generated here so the share URL can be copied without a
+	 * reducer return value.
+	 */
+	async ensureShareInvite(canWrite: boolean): Promise<string> {
+		if (this.#closed) {
+			throw new Error("session is closed");
+		}
+		const existing = this.#rows(this.#connection.db.shareInvite).find(
+			(row) => row.canWrite === canWrite,
+		);
+		if (existing) {
+			return existing.token;
+		}
+		const token = crypto.randomUUID();
+		await this.#connection.reducers.createShareInvite({
+			projectId: this.projectId,
+			token,
+			canWrite,
+		});
+		return token;
+	}
+
+	/** Lets other people join this project. Only the host can start it. */
+	async startLiveSession(): Promise<void> {
+		if (this.#closed) {
+			throw new Error("session is closed");
+		}
+		await this.#connection.reducers.startLiveSession({
+			projectId: this.projectId,
+		});
+	}
+
+	/** Ends the live session and removes everyone except the host. */
+	async stopLiveSession(): Promise<void> {
+		if (this.#closed) {
+			throw new Error("session is closed");
+		}
+		await this.#connection.reducers.stopLiveSession({
+			projectId: this.projectId,
+		});
+	}
+
+	/** Removes one person from the live session. Only the host can do this. */
+	async removeParticipant(identity: string): Promise<void> {
+		if (this.#closed) {
+			throw new Error("session is closed");
+		}
+		await this.#connection.reducers.removeParticipant({
+			projectId: this.projectId,
+			identity,
+		});
+	}
+
+	/**
+	 * Writes one slice of a shared video or audio file.
+	 *
+	 * The asset must already be registered with storage `spacetime`.
+	 */
+	async putAssetChunk(options: {
+		assetId: string;
+		chunkIndex: number;
+		chunkCount: number;
+		bytes: Uint8Array;
+	}): Promise<void> {
+		if (this.#closed) {
+			throw new Error("session is closed");
+		}
+		await this.#connection.reducers.putAssetChunk({
+			projectId: this.projectId,
+			assetId: options.assetId,
+			chunkIndex: options.chunkIndex,
+			chunkCount: options.chunkCount,
+			bytes: options.bytes,
+		});
+	}
+
+	/** Slices of one shared file currently in the local cache. */
+	assetChunks(assetId: string): MediaChunk[] {
+		return this.#rows(this.#connection.db.assetChunk)
+			.filter((row) => row.assetId === assetId)
+			.map((row) => ({
+				index: row.chunkIndex,
+				count: row.chunkCount,
+				bytes: row.bytes,
+			}));
+	}
+
+	onAssetChunks(listener: Listener<void>): () => void {
+		this.#chunkListeners.add(listener);
+		return () => this.#chunkListeners.delete(listener);
+	}
+
+	/** Drops this person from the live session. The host stops the session instead. */
+	async leaveSession(): Promise<void> {
+		if (this.#closed) {
+			throw new Error("session is closed");
+		}
+		this.#leftVoluntarily = true;
+		try {
+			await this.#connection.reducers.leaveSession({
+				projectId: this.projectId,
+			});
+		} catch (error) {
+			this.#leftVoluntarily = false;
+			throw error;
+		}
+	}
+
 	/**
 	 * Sends an editor action to the shared project.
 	 *
@@ -116,7 +301,7 @@ export class CollabSession {
 	 * another editor must not be echoed back as a local one.
 	 */
 	async dispatch(command: EditorCommand): Promise<void> {
-		if (this.#applyingRemote || this.#closed) {
+		if (this.#applyingRemote || this.#closed || !this.canWrite) {
 			return;
 		}
 		const { reducers } = this.#connection;
@@ -407,15 +592,102 @@ export class CollabSession {
 
 	collaborators(): Collaborator[] {
 		const self = this.connectionId;
-		return this.#rows(this.#connection.db.presence)
-			.filter((presence) => presence.projectId === this.projectId)
-			.map((presence) =>
-				toCollaborator({
-					presence,
-					user: this.#connection.db.user.identity.find(presence.identity),
-					isSelf: presence.connectionId.toHexString() === self,
-				}),
-			);
+		const stored = this.#rows(this.#connection.db.collaborator);
+		const grouped = new Map<string, typeof stored>();
+		for (const row of stored) {
+			const identity = row.identity.toHexString();
+			const rows = grouped.get(identity);
+			if (rows) {
+				rows.push(row);
+			} else {
+				grouped.set(identity, [row]);
+			}
+		}
+
+		const people: Collaborator[] = [];
+		for (const rows of grouped.values()) {
+			const mine = rows.find((row) => row.connectionId.toHexString() === self);
+			const newest = [...rows].sort(
+				(left, right) => right.lastSeen.toDate().getTime() - left.lastSeen.toDate().getTime(),
+			)[0];
+			if (!newest) {
+				continue;
+			}
+			let presence = null;
+			for (const row of rows) {
+				const next = this.#connection.db.presence.connectionId.find(row.connectionId);
+				if (!next) {
+					continue;
+				}
+				if (
+					!presence ||
+					next.updatedAt.toDate().getTime() >= presence.updatedAt.toDate().getTime()
+				) {
+					presence = next;
+				}
+			}
+			const person = toCollaborator({
+				row: newest,
+				presence,
+				isSelf: mine != null,
+			});
+			person.canWrite = rows.some((row) => row.canWrite);
+			person.atCapacity = !person.canWrite && rows.some((row) => row.atCapacity);
+			person.connectionId = (mine ?? newest).connectionId.toHexString();
+			people.push(person);
+		}
+		return people;
+	}
+
+	/**
+	 * Drops collaborators the server has not heard from recently.
+	 *
+	 * Opening the participant list calls this so a disconnected window does not
+	 * keep a cursor or an edit seat.
+	 */
+	async refreshParticipants(): Promise<void> {
+		if (this.#closed) {
+			return;
+		}
+		await this.#connection.reducers.refreshParticipants({
+			projectId: this.projectId,
+		});
+	}
+
+	/**
+	 * Switches one window between editing and view-only.
+	 *
+	 * The server refuses a promotion once four people already hold an edit seat.
+	 */
+	async setParticipantAccess(connectionId: string, canWrite: boolean): Promise<void> {
+		if (this.#closed) {
+			throw new Error("session is closed");
+		}
+		await this.#connection.reducers.setParticipantAccess({
+			projectId: this.projectId,
+			connectionId,
+			canWrite,
+		});
+	}
+
+	/**
+	 * How many edit seats are taken, including the owner's reserved seat.
+	 *
+	 * Agents are not counted. Matches the server cap of four.
+	 */
+	editorCount(): number {
+		const owner = this.#project()?.owner.toHexString();
+		const seats = new Set<string>();
+		if (owner) {
+			seats.add(owner);
+		}
+		for (const row of this.#rows(this.#connection.db.collaborator)) {
+			if (!row.canWrite || lower(row.kind.tag) === "agent") {
+				continue;
+			}
+			seats.add(row.identity.toHexString());
+		}
+		return seats.size;
 	}
 
 	onSnapshot(listener: Listener<SnapshotChange>): () => void {
@@ -433,6 +705,21 @@ export class CollabSession {
 		return () => this.#collaboratorListeners.delete(listener);
 	}
 
+	onWriteAccess(listener: Listener<boolean>): () => void {
+		this.#accessListeners.add(listener);
+		return () => this.#accessListeners.delete(listener);
+	}
+
+	onLiveSession(listener: Listener<boolean>): () => void {
+		this.#liveListeners.add(listener);
+		return () => this.#liveListeners.delete(listener);
+	}
+
+	onDeparture(listener: Listener<SessionDeparture>): () => void {
+		this.#departureListeners.add(listener);
+		return () => this.#departureListeners.delete(listener);
+	}
+
 	close(): void {
 		if (this.#closed) {
 			return;
@@ -441,6 +728,10 @@ export class CollabSession {
 		this.#snapshotListeners.clear();
 		this.#editListeners.clear();
 		this.#collaboratorListeners.clear();
+		this.#accessListeners.clear();
+		this.#liveListeners.clear();
+		this.#departureListeners.clear();
+		this.#chunkListeners.clear();
 		this.#connection.disconnect();
 	}
 
@@ -462,8 +753,12 @@ export class CollabSession {
 					scoped("clip"),
 					scoped("clip_effect"),
 					scoped("asset"),
+					scoped("asset_chunk"),
 					scoped("presence"),
 					scoped("edit_history"),
+					scoped("share_invite"),
+					scoped("collaborator"),
+					scoped("live_session"),
 					// Collaborator names and colours are not project-scoped.
 					"SELECT * FROM user",
 				]);
@@ -478,6 +773,9 @@ export class CollabSession {
 		this.#watchProjectState();
 		this.#watchPresence();
 		this.#watchHistory();
+		this.#watchAccess();
+		this.#watchLiveSession();
+		this.#watchAssetChunks();
 	}
 
 	/**
@@ -489,9 +787,7 @@ export class CollabSession {
 	 */
 	async #joinWhenProjectExists(): Promise<void> {
 		if (this.#project() != null) {
-			await this.#connection.reducers.joinProject({
-				projectId: this.projectId,
-			});
+			await this.#joinProject();
 			return;
 		}
 
@@ -499,10 +795,17 @@ export class CollabSession {
 			if (row.id !== this.projectId || this.#closed) {
 				return;
 			}
-			void this.#connection.reducers
-				.joinProject({ projectId: this.projectId })
-				.catch(() => {});
+			void this.#joinProject().catch(() => {});
 		});
+	}
+
+	async #joinProject(): Promise<void> {
+		await this.#connection.reducers.joinProject({
+			projectId: this.projectId,
+			inviteToken: this.#inviteToken,
+			displayName: this.#displayName,
+		});
+		this.#joined = true;
 	}
 
 	#watchProjectState(): void {
@@ -546,6 +849,80 @@ export class CollabSession {
 		db.presence.onDelete(emit);
 		db.user.onInsert(emit);
 		db.user.onUpdate(emit);
+		db.collaborator.onInsert(emit);
+		db.collaborator.onUpdate(emit);
+		db.collaborator.onDelete((_ctx, row) => {
+			if (row.connectionId.toHexString() === this.connectionId) {
+				this.#noteOwnRowGone();
+			}
+			emit();
+		});
+	}
+
+	#watchLiveSession(): void {
+		const emit = () => {
+			if (this.#joined && !this.isHost && !this.sessionLive) {
+				this.#depart("ended");
+			}
+			for (const listener of this.#liveListeners) {
+				listener(this.sessionLive);
+			}
+		};
+		const { liveSession } = this.#connection.db;
+		liveSession.onInsert(emit);
+		liveSession.onUpdate(emit);
+		liveSession.onDelete(emit);
+	}
+
+	#noteOwnRowGone(): void {
+		if (!this.#joined || this.isHost) {
+			return;
+		}
+		if (this.#leftVoluntarily) {
+			this.#depart("left");
+			return;
+		}
+		this.#depart(this.sessionLive ? "removed" : "ended");
+	}
+
+	#depart(reason: SessionDeparture): void {
+		if (this.#departure === "ended" || this.#departure === "left") {
+			return;
+		}
+		if (this.#departure === reason) {
+			return;
+		}
+		this.#departure = reason;
+		for (const listener of this.#departureListeners) {
+			listener(reason);
+		}
+		for (const listener of this.#accessListeners) {
+			listener(this.canWrite);
+		}
+	}
+
+	#watchAssetChunks(): void {
+		const emit = () => {
+			for (const listener of this.#chunkListeners) {
+				listener();
+			}
+		};
+		const { assetChunk } = this.#connection.db;
+		assetChunk.onInsert(emit);
+		assetChunk.onUpdate(emit);
+		assetChunk.onDelete(emit);
+	}
+
+	#watchAccess(): void {
+		const emit = () => {
+			const canWrite = this.canWrite;
+			for (const listener of this.#accessListeners) {
+				listener(canWrite);
+			}
+		};
+		this.#connection.db.collaborator.onInsert(emit);
+		this.#connection.db.collaborator.onUpdate(emit);
+		this.#connection.db.collaborator.onDelete(emit);
 	}
 
 	#watchHistory(): void {
@@ -593,6 +970,11 @@ export class CollabSession {
 
 	#project() {
 		return this.#connection.db.project.id.find(this.projectId);
+	}
+
+	#ownAccess() {
+		const connectionId = this.#connection.connectionId;
+		return this.#connection.db.collaborator.connectionId.find(connectionId);
 	}
 
 	/** Collects a table's rows, filtered to this project where applicable. */

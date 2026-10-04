@@ -34,6 +34,16 @@ export const Asset = __t.object("Asset", {
 });
 export type Asset = __Infer<typeof Asset>;
 
+export const AssetChunk = __t.object("AssetChunk", {
+  id: __t.string(),
+  projectId: __t.string(),
+  assetId: __t.string(),
+  chunkIndex: __t.u32(),
+  chunkCount: __t.u32(),
+  bytes: __t.byteArray(),
+});
+export type AssetChunk = __Infer<typeof AssetChunk>;
+
 export const AssetInput = __t.object("AssetInput", {
   id: __t.string(),
   name: __t.string(),
@@ -54,6 +64,7 @@ export const AssetStorage = __t.enum("AssetStorage", {
   Local: __t.unit(),
   S3: __t.unit(),
   R2: __t.unit(),
+  Spacetime: __t.unit(),
 });
 export type AssetStorage = __Infer<typeof AssetStorage>;
 
@@ -128,6 +139,24 @@ export const ClipKind = __t.enum("ClipKind", {
 });
 export type ClipKind = __Infer<typeof ClipKind>;
 
+export const Collaborator = __t.object("Collaborator", {
+  connectionId: __t.connectionId(),
+  projectId: __t.string(),
+  identity: __t.identity(),
+  displayName: __t.string(),
+  color: __t.string(),
+  get kind() {
+    return ActorKind;
+  },
+  get role() {
+    return MemberRole;
+  },
+  canWrite: __t.bool(),
+  atCapacity: __t.bool(),
+  lastSeen: __t.timestamp(),
+});
+export type Collaborator = __Infer<typeof Collaborator>;
+
 export const EditHistory = __t.object("EditHistory", {
   id: __t.u64(),
   projectId: __t.string(),
@@ -176,11 +205,20 @@ export const EditOp = __t.enum("EditOp", {
 });
 export type EditOp = __Infer<typeof EditOp>;
 
+export const LiveSession = __t.object("LiveSession", {
+  projectId: __t.string(),
+  host: __t.identity(),
+  active: __t.bool(),
+  startedAt: __t.timestamp(),
+});
+export type LiveSession = __Infer<typeof LiveSession>;
+
 // The tagged union or sum type for the algebraic type `MemberRole`.
 export const MemberRole = __t.enum("MemberRole", {
   Owner: __t.unit(),
   Editor: __t.unit(),
   Agent: __t.unit(),
+  Viewer: __t.unit(),
 });
 export type MemberRole = __Infer<typeof MemberRole>;
 
@@ -248,6 +286,15 @@ export const Scene = __t.object("Scene", {
   position: __t.u32(),
 });
 export type Scene = __Infer<typeof Scene>;
+
+export const ShareInvite = __t.object("ShareInvite", {
+  token: __t.string(),
+  projectId: __t.string(),
+  canWrite: __t.bool(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type ShareInvite = __Infer<typeof ShareInvite>;
 
 // The tagged union or sum type for the algebraic type `SplitSide`.
 export const SplitSide = __t.enum("SplitSide", {

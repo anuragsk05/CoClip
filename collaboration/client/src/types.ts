@@ -39,9 +39,10 @@ export type ClipKind =
 	| "sticker"
 	| "graphic"
 	| "effect";
-export type AssetStorage = "local" | "s3" | "r2";
+export type AssetStorage = "local" | "s3" | "r2" | "spacetime";
 export type RetainSide = "both" | "left" | "right";
 export type ActorKind = "human" | "agent";
+export type MemberRole = "owner" | "editor" | "agent" | "viewer";
 
 export interface CollabTrack {
 	id: string;
@@ -131,7 +132,12 @@ export interface Collaborator {
 	name: string;
 	color: string;
 	kind: ActorKind;
+	role: MemberRole;
 	isSelf: boolean;
+	/** This window may change the timeline. */
+	canWrite: boolean;
+	/** A write link was refused because four editors are already active. */
+	atCapacity: boolean;
 	sceneId: string;
 	playhead: number;
 	selection: string[];

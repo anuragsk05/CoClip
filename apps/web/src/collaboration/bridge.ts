@@ -26,6 +26,7 @@ import { mediaTimeFromSeconds } from "@/wasm";
 import { diffProjects } from "./diff";
 import { flattenScene } from "./flatten";
 import { rebuildScene } from "./rebuild";
+import { uploadSharedMedia, watchSharedMedia } from "./shared-media";
 
 export interface BridgeOptions {
 	editor: EditorCore;
@@ -62,9 +63,12 @@ export class CollaborationBridge {
 
 		bridge.#interceptSceneWrites();
 		bridge.#followSharedState();
-		bridge.#followLocalSettings();
-		bridge.#followLocalMedia();
-		void bridge.#publishAssets();
+		bridge.#followSharedMedia();
+		if (session.canWrite) {
+			bridge.#followLocalSettings();
+			bridge.#followLocalMedia();
+			void bridge.#publishAssets();
+		}
 
 		return bridge;
 	}
@@ -92,7 +96,25 @@ export class CollaborationBridge {
 		const timeline = this.#editor.timeline;
 		const original = timeline.updateTracks.bind(timeline);
 
+		const originalCommit = timeline.commitPreview.bind(timeline);
+		timeline.commitPreview = (): void => {
+			if (!this.#session.canWrite) {
+				timeline.discardPreview();
+				return;
+			}
+			originalCommit();
+		};
+		this.#teardown.push(() => {
+			timeline.commitPreview = originalCommit;
+		});
+
 		timeline.updateTracks = (next: SceneTracks): void => {
+			if (
+				!this.#session.canWrite &&
+				!this.#session.isApplyingRemote
+			) {
+				return;
+			}
 			const before = this.#editor.scenes.getActiveSceneOrNull()?.tracks ?? null;
 			original(next);
 
@@ -162,7 +184,11 @@ export class CollaborationBridge {
 
 		this.#teardown.push(
 			this.#editor.project.subscribe(() => {
-				if (this.#detached || this.#session.isApplyingRemote) {
+				if (
+					this.#detached ||
+					this.#session.isApplyingRemote ||
+					!this.#session.canWrite
+				) {
 					return;
 				}
 				const next = this.#currentMetadata();
@@ -182,7 +208,11 @@ export class CollaborationBridge {
 
 		this.#teardown.push(
 			this.#editor.media.subscribe(() => {
-				if (this.#detached || this.#session.isApplyingRemote) {
+				if (
+					this.#detached ||
+					this.#session.isApplyingRemote ||
+					!this.#session.canWrite
+				) {
 					return;
 				}
 				const assets = this.#editor.media.getAssets();
@@ -196,16 +226,27 @@ export class CollaborationBridge {
 		);
 	}
 
+	/** Saves video and audio that other editors have uploaded into this session. */
+	#followSharedMedia(): void {
+		const projectId = this.#editor.project.getActiveOrNull()?.metadata.id;
+		if (!projectId) {
+			return;
+		}
+		this.#teardown.push(
+			watchSharedMedia({
+				editor: this.#editor,
+				session: this.#session,
+				projectId,
+			}),
+		);
+	}
+
 	/**
-	 * Shares asset references, not bytes.
-	 *
-	 * Local media is registered with `storage: "local"`, which tells other
-	 * editors that a clip refers to media they do not have. Uploading the bytes
-	 * to S3 or R2 and re-registering with that location is what makes the media
-	 * resolvable on another machine.
+	 * Registers each asset, then uploads video and audio bytes into the session.
 	 */
 	async #publishAssets(): Promise<void> {
-		for (const asset of this.#editor.media.getAssets()) {
+		const assets = this.#editor.media.getAssets();
+		for (const asset of assets) {
 			try {
 				await this.#session.dispatch({
 					kind: "registerAsset",
@@ -214,6 +255,11 @@ export class CollaborationBridge {
 			} catch (error) {
 				this.#onError(asError(error));
 			}
+		}
+		try {
+			await uploadSharedMedia(this.#session, assets);
+		} catch (error) {
+			this.#onError(asError(error));
 		}
 	}
 
@@ -276,10 +322,10 @@ function toCollabAsset(asset: MediaAsset): CollabAsset {
 	return {
 		id: asset.id,
 		name: asset.name,
-		storage: "local",
-		// The editor resolves local media by id; a blob URL is per-session and
-		// meaningless to anyone else.
-		location: asset.id,
+		storage: asset.type === "video" || asset.type === "audio" ? "spacetime" : "local",
+		// Video and audio bytes are uploaded as chunks. Anything else stays a
+		// local id, which only this browser can resolve.
+		location: asset.type === "video" || asset.type === "audio" ? "chunks" : asset.id,
 		mimeType: asset.file?.type ?? "application/octet-stream",
 		byteSize: asset.file?.size ?? null,
 		width: asset.width ?? null,

@@ -8,8 +8,9 @@ import { useEditor } from "@/editor/use-editor";
 import { useKeybindingsListener } from "@/actions/use-keybindings";
 import { useKeybindingsStore } from "@/actions/keybindings-store";
 import { useTimelineStore } from "@/timeline/timeline-store";
+import { JoinNameGate } from "@/collaboration/components/join-name-gate";
 import { CollaborationProvider } from "@/collaboration/collaboration-provider";
-import { isCollaborationEnabled } from "@/collaboration/config";
+import { isCollaborationEnabled, needsJoinName } from "@/collaboration/config";
 import { joinSharedProject } from "@/collaboration/join";
 import { useEditorActions } from "@/actions/use-editor-actions";
 import { loadFontAtlas } from "@/fonts/google-fonts";
@@ -29,6 +30,9 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [nameGate, setNameGate] = useState<"pending" | "ask" | "ready">(
+		"pending",
+	);
 	const { setLoadingProject } = useKeybindingsStore();
 
 	useRegisterTabLoading(isLoading, "editor-loading-project", "Loading project...");
@@ -49,6 +53,14 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 	}, [isLoading, setLoadingProject]);
 
 	useEffect(() => {
+		setNameGate(needsJoinName() ? "ask" : "ready");
+	}, [projectId]);
+
+	useEffect(() => {
+		if (nameGate !== "ready") {
+			return;
+		}
+
 		let cancelled = false;
 		const editor = EditorCore.getInstance();
 
@@ -72,11 +84,22 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 						err.message.includes("does not exist"));
 
 				if (isNotFound && isCollaborationEnabled()) {
-					const joined = await joinSharedProject({ projectId, editor });
-					if (cancelled) return;
-					if (joined) {
+					try {
+						const joined = await joinSharedProject({ projectId, editor });
+						if (cancelled) return;
+						if (joined) {
+							setIsLoading(false);
+							loadFontAtlas();
+							return;
+						}
+					} catch (joinError) {
+						if (cancelled) return;
+						setError(
+							joinError instanceof Error
+								? joinError.message
+								: "The host has not started a CoClip session",
+						);
 						setIsLoading(false);
-						loadFontAtlas();
 						return;
 					}
 				}
@@ -112,7 +135,11 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 		return () => {
 			cancelled = true;
 		};
-	}, [projectId, router]);
+	}, [projectId, router, nameGate]);
+
+	if (nameGate === "ask") {
+		return <JoinNameGate onJoin={() => setNameGate("ready")} />;
+	}
 
 	if (error) {
 		return (

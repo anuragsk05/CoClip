@@ -10,8 +10,9 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  projectId: __t.string(),
-  inviteToken: __t.string(),
-  displayName: __t.string(),
-};
+export default __t.row({
+  projectId: __t.string().primaryKey().name("project_id"),
+  host: __t.identity(),
+  active: __t.bool(),
+  startedAt: __t.timestamp().name("started_at"),
+});

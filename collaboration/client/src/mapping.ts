@@ -11,6 +11,7 @@ import type {
 	Clip,
 	ClipEffect,
 	ClipKind as ClipKindRow,
+	Collaborator as CollaboratorRow,
 	EditHistory,
 	Presence,
 	Project,
@@ -19,12 +20,12 @@ import type {
 	Track,
 	TrackGroup as TrackGroupRow,
 	TrackKind as TrackKindRow,
-	User,
 } from "./module_bindings/types";
 import type {
 	ActorKind,
 	AssetStorage,
 	ClipKind,
+	MemberRole,
 	CollabAsset,
 	CollabClip,
 	CollabEffect,
@@ -120,6 +121,8 @@ export function assetStorageToRow(
 			return { tag: "S3" };
 		case "r2":
 			return { tag: "R2" };
+		case "spacetime":
+			return { tag: "Spacetime" };
 	}
 }
 
@@ -136,7 +139,7 @@ export function retainSideToRow(retain: RetainSide): {
 	}
 }
 
-function lower<T extends string>(tag: string): T {
+export function lower<T extends string>(tag: string): T {
 	return tag.toLowerCase() as T;
 }
 
@@ -225,27 +228,31 @@ export function projectRevision(row: Project): number {
 }
 
 export function toCollaborator({
+	row,
 	presence,
-	user,
 	isSelf,
 }: {
-	presence: Presence;
-	user: User | null | undefined;
+	row: CollaboratorRow;
+	presence?: Presence | null;
 	isSelf: boolean;
 }): Collaborator {
-	const identity = presence.identity.toHexString();
 	return {
-		identity,
-		connectionId: presence.connectionId.toHexString(),
-		name: user?.name ?? "Editor",
-		color: user?.color ?? "#64748b",
-		kind: lower<ActorKind>(user?.kind.tag ?? "Human"),
+		identity: row.identity.toHexString(),
+		connectionId: row.connectionId.toHexString(),
+		name: row.displayName || "Editor",
+		color: row.color || "#64748b",
+		kind: lower<ActorKind>(row.kind.tag),
+		role: lower<MemberRole>(row.role.tag),
 		isSelf,
-		sceneId: presence.sceneId,
-		playhead: toTicks(presence.playhead),
-		selection: presence.selection,
-		isPlaying: presence.isPlaying,
-		cursor: { x: presence.cursorX, y: presence.cursorY },
+		canWrite: row.canWrite,
+		atCapacity: row.atCapacity,
+		sceneId: presence?.sceneId ?? "",
+		playhead: presence ? toTicks(presence.playhead) : 0,
+		selection: presence?.selection ?? [],
+		isPlaying: presence?.isPlaying ?? false,
+		cursor: presence
+			? { x: presence.cursorX, y: presence.cursorY }
+			: { x: -1, y: -1 },
 	};
 }
 

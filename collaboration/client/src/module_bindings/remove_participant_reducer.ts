@@ -12,6 +12,5 @@ import {
 
 export default {
   projectId: __t.string(),
-  inviteToken: __t.string(),
-  displayName: __t.string(),
+  identity: __t.string(),
 };

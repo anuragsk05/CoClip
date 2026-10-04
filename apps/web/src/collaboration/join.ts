@@ -19,6 +19,7 @@ import type { TScene } from "@/timeline";
 
 import { collaborationConfig, isCollaborationEnabled } from "./config";
 import { rebuildScene } from "./rebuild";
+import { readShareToken } from "./share-access";
 
 export async function joinSharedProject({
 	projectId,
@@ -39,6 +40,7 @@ export async function joinSharedProject({
 			database: config.database,
 			projectId,
 			profile: config.profile,
+			inviteToken: readShareToken() ?? undefined,
 		});
 		if (!session.isProjectLoaded) {
 			return false;
@@ -49,6 +51,12 @@ export async function joinSharedProject({
 		return true;
 	} catch (error) {
 		console.error("Failed to join shared project:", error);
+		if (
+			error instanceof Error &&
+			error.message.includes("has not started a CoClip session")
+		) {
+			throw error;
+		}
 		return false;
 	} finally {
 		session?.close();

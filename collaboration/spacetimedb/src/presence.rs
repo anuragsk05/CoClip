@@ -7,6 +7,7 @@
 use spacetimedb::{ConnectionId, ReducerContext, Table};
 
 use crate::edit::{ensure_user, membership};
+use crate::projects::note_collaborator_seen;
 use crate::schema::{Presence, presence};
 
 #[spacetimedb::reducer]
@@ -23,6 +24,7 @@ pub fn update_presence(
     let connection_id = require_connection(ctx)?;
     require_member(ctx, &project_id)?;
     ensure_user(ctx);
+    note_collaborator_seen(ctx);
 
     write(
         ctx,
@@ -51,6 +53,7 @@ pub fn set_playhead(
 ) -> Result<(), String> {
     let connection_id = require_connection(ctx)?;
     require_member(ctx, &project_id)?;
+    note_collaborator_seen(ctx);
 
     let existing = current(ctx, connection_id, &project_id, &ctx.sender());
     write(
@@ -73,6 +76,7 @@ pub fn set_selection(
 ) -> Result<(), String> {
     let connection_id = require_connection(ctx)?;
     require_member(ctx, &project_id)?;
+    note_collaborator_seen(ctx);
 
     let existing = current(ctx, connection_id, &project_id, &ctx.sender());
     write(

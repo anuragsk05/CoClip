@@ -10,8 +10,11 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  projectId: __t.string(),
-  inviteToken: __t.string(),
-  displayName: __t.string(),
-};
+export default __t.row({
+  id: __t.string().primaryKey(),
+  projectId: __t.string().name("project_id"),
+  assetId: __t.string().name("asset_id"),
+  chunkIndex: __t.u32().name("chunk_index"),
+  chunkCount: __t.u32().name("chunk_count"),
+  bytes: __t.byteArray(),
+});

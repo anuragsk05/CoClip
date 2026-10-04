@@ -25,7 +25,7 @@ interface ChatLine {
 }
 
 export function AgentPanel() {
-	const { status } = useCollaborationState();
+	const { status, canWrite } = useCollaborationState();
 	const projectId = useEditor((editor) => editor.project.getActive().metadata.id);
 	const [open, setOpen] = useState(false);
 	const [mode, setMode] = useState<Mode>("chat");
@@ -33,7 +33,7 @@ export function AgentPanel() {
 	const [busy, setBusy] = useState(false);
 	const [lines, setLines] = useState<ChatLine[]>([]);
 
-	if (status === "disabled") {
+	if (status === "disabled" || !canWrite) {
 		return null;
 	}
 

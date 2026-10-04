@@ -1,5 +1,7 @@
+export { assembleMediaChunks, MEDIA_CHUNK_BYTES } from "./media-bytes";
+export type { MediaChunk } from "./media-bytes";
 export { CollabSession } from "./session";
-export type { SessionOptions, SnapshotChange } from "./session";
+export type { SessionDeparture, SessionOptions, SnapshotChange } from "./session";
 export {
 	browserTokenStore,
 	connect,
@@ -14,6 +16,7 @@ export {
 export type {
 	ActorKind,
 	AssetStorage,
+	MemberRole,
 	ClipKind,
 	CollabAsset,
 	CollabClip,

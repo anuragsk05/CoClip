@@ -7,15 +7,31 @@
  * only owns their lifetime and re-renders on presence changes.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 
 import { CollabSession } from "@opencut/collab-client";
-import type { Collaborator, RemoteEdit } from "@opencut/collab-client";
+import type {
+	Collaborator,
+	RemoteEdit,
+	SessionDeparture,
+} from "@opencut/collab-client";
 
 import { EditorCore } from "@/core";
 
 import { CollaborationBridge } from "./bridge";
 import { collaborationConfig, isCollaborationEnabled } from "./config";
+import { readShareToken } from "./share-access";
+import {
+	getLocalCursor,
+	getServerLocalCursor,
+	subscribeLocalCursor,
+} from "./local-cursor";
 
 export type CollaborationStatus =
 	| "disabled"
@@ -29,6 +45,16 @@ export interface CollaborationState {
 	recentEdits: RemoteEdit[];
 	error: Error | null;
 	session: CollabSession | null;
+	/** False when this browser joined through a view-only share link. */
+	canWrite: boolean;
+	/** True when a write link was refused because four editors are already in. */
+	atCapacity: boolean;
+	/** This browser owns the project. */
+	isHost: boolean;
+	/** The host has started a CoClip session other people can join. */
+	sessionLive: boolean;
+	/** Set when the host ends the session or removes this person. */
+	departure: SessionDeparture | null;
 }
 
 const MAX_RECENT_EDITS = 50;
@@ -49,6 +75,11 @@ export function useCollaboration({
 	// State, not a ref: consumers render presence from the session, so they have
 	// to re-render when it arrives.
 	const [activeSession, setActiveSession] = useState<CollabSession | null>(null);
+	const [canWrite, setCanWrite] = useState(() => readShareToken() == null);
+	const [atCapacity, setAtCapacity] = useState(false);
+	const [isHost, setIsHost] = useState(false);
+	const [sessionLive, setSessionLive] = useState(false);
+	const [departure, setDeparture] = useState<SessionDeparture | null>(null);
 
 	useEffect(() => {
 		if (!enabled || !isCollaborationEnabled()) {
@@ -68,6 +99,7 @@ export function useCollaboration({
 					database: config.database,
 					projectId,
 					profile: config.profile,
+					inviteToken: readShareToken() ?? undefined,
 					onDisconnect: () => {
 						if (!cancelled) {
 							setStatus("error");
@@ -89,9 +121,32 @@ export function useCollaboration({
 
 				setActiveSession(session);
 				setCollaborators(session.collaborators());
+				setCanWrite(session.canWrite);
+				setAtCapacity(session.atCapacity);
+				setIsHost(session.isHost);
+				setSessionLive(session.sessionLive);
+				setDeparture(session.departure);
 				setStatus("connected");
 
-				session.onCollaborators(setCollaborators);
+				session.onCollaborators((next) => {
+					setCollaborators(next);
+					setCanWrite(session.canWrite);
+					setAtCapacity(session.atCapacity);
+					setIsHost(session.isHost);
+				});
+				session.onWriteAccess((next) => {
+					setCanWrite(next);
+					setAtCapacity(session.atCapacity);
+				});
+				session.onLiveSession((live) => {
+					setSessionLive(live);
+					setCanWrite(session.canWrite);
+					setDeparture(session.departure);
+				});
+				session.onDeparture((reason) => {
+					setDeparture(reason);
+					setCanWrite(session.canWrite);
+				});
 				session.onEdit((edit) => {
 					setRecentEdits((edits) =>
 						[edit, ...edits].slice(0, MAX_RECENT_EDITS),
@@ -120,14 +175,26 @@ export function useCollaboration({
 		};
 	}, [projectId, enabled]);
 
-	return { status, collaborators, recentEdits, error, session: activeSession };
+	return {
+		status,
+		collaborators,
+		recentEdits,
+		error,
+		session: activeSession,
+		canWrite,
+		atCapacity,
+		isHost,
+		sessionLive,
+		departure,
+	};
 }
 
 /**
- * Publishes this editor's playhead and selection.
+ * Publishes this editor's playhead, selection, and pointer.
  *
  * Presence is throttled because the playhead changes every frame during
- * playback, and a collaborator's cursor does not need that resolution.
+ * playback. The pointer is included on the same cadence so a moving cursor
+ * stays current without a second reducer.
  */
 export function usePresencePublisher({
 	session,
@@ -135,7 +202,7 @@ export function usePresencePublisher({
 	playhead,
 	selection,
 	isPlaying,
-	intervalMs = 100,
+	intervalMs = 40,
 }: {
 	session: CollabSession | null;
 	sceneId: string | null;
@@ -146,9 +213,14 @@ export function usePresencePublisher({
 }): void {
 	const lastSentAt = useRef(0);
 	const pending = useRef<number | null>(null);
+	const cursor = useSyncExternalStore(
+		subscribeLocalCursor,
+		getLocalCursor,
+		getServerLocalCursor,
+	);
 
 	const publish = useCallback(() => {
-		if (!session || !sceneId) {
+		if (!session || !sceneId || session.departure) {
 			return;
 		}
 		session.publishPresence({
@@ -156,9 +228,9 @@ export function usePresencePublisher({
 			playhead,
 			selection,
 			isPlaying,
-			cursor: { x: 0, y: 0 },
+			cursor: getLocalCursor(),
 		});
-	}, [session, sceneId, playhead, selection, isPlaying]);
+	}, [session, sceneId, playhead, selection, isPlaying, cursor]);
 
 	useEffect(() => {
 		if (!session || !sceneId) {
@@ -184,4 +256,18 @@ export function usePresencePublisher({
 			}
 		};
 	}, [publish, session, sceneId, intervalMs]);
+
+	// A quiet window still has to be heard from, or a participant refresh
+	// treats it as disconnected and drops its edit seat.
+	useEffect(() => {
+		if (!session || !sceneId) {
+			return;
+		}
+		const heartbeat = window.setInterval(() => {
+			publish();
+		}, 5_000);
+		return () => {
+			window.clearInterval(heartbeat);
+		};
+	}, [publish, session, sceneId]);
 }

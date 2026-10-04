@@ -44,6 +44,8 @@ pub enum AssetStorage {
     Local,
     S3,
     R2,
+    /// The file bytes live in [`AssetChunk`] rows for this project.
+    Spacetime,
 }
 
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq)]
@@ -57,6 +59,7 @@ pub enum MemberRole {
     Owner,
     Editor,
     Agent,
+    Viewer,
 }
 
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq)]
@@ -149,6 +152,61 @@ pub struct ProjectMember {
     pub joined_at: Timestamp,
 }
 
+/// One connection in a live session.
+///
+/// A person is their Spacetime identity, saved in the browser, not the address
+/// of the machine. Several connections can belong to one identity; the
+/// participant list shows that person once. `can_write` is this connection:
+/// a view link cannot edit, even when the same person can edit elsewhere.
+#[spacetimedb::table(accessor = collaborator, public)]
+pub struct Collaborator {
+    #[primary_key]
+    pub connection_id: ConnectionId,
+    #[index(btree)]
+    pub project_id: String,
+    pub identity: Identity,
+    /// Name typed for this window. Kept per connection so two windows of the
+    /// same browser do not overwrite each other's cursor label.
+    pub display_name: String,
+    /// Server-assigned presence colour for this person.
+    pub color: String,
+    pub kind: ActorKind,
+    pub role: MemberRole,
+    pub can_write: bool,
+    /// True when a write link was refused because four editors are already active.
+    pub at_capacity: bool,
+    /// Advanced while this window is connected. A refresh drops rows older than
+    /// the stale window so a dropped connection does not keep a cursor or a seat.
+    pub last_seen: Timestamp,
+}
+
+/// Whether the host is currently letting other people into the project.
+///
+/// The host is the project owner. They can edit alone while this is inactive.
+/// Other people join only after the host starts the session, and a stop removes
+/// them.
+#[spacetimedb::table(accessor = live_session, public)]
+pub struct LiveSession {
+    #[primary_key]
+    pub project_id: String,
+    pub host: Identity,
+    pub active: bool,
+    pub started_at: Timestamp,
+}
+
+/// A shareable invite. The token is the secret: view tokens grant Viewer,
+/// write tokens grant Editor. The project id alone is not enough to edit.
+#[spacetimedb::table(accessor = share_invite, public)]
+pub struct ShareInvite {
+    #[primary_key]
+    pub token: String,
+    #[index(btree)]
+    pub project_id: String,
+    pub can_write: bool,
+    pub created_by: Identity,
+    pub created_at: Timestamp,
+}
+
 #[spacetimedb::table(accessor = scene, public)]
 pub struct Scene {
     #[primary_key]
@@ -239,9 +297,11 @@ pub struct ClipEffect {
     pub revision: u64,
 }
 
-/// A reference to media held elsewhere.
+/// A reference to media.
 ///
-/// The bytes stay in local storage, S3, or R2. Only the reference is shared.
+/// Video and audio bytes live in [`AssetChunk`] when `storage` is
+/// [`AssetStorage::Spacetime`]. Images and other files may still be a local
+/// or object-storage reference.
 #[spacetimedb::table(accessor = asset, public)]
 pub struct Asset {
     #[primary_key]
@@ -258,6 +318,24 @@ pub struct Asset {
     pub height: Option<u32>,
     pub duration: Option<i64>,
     pub created_at: Timestamp,
+}
+
+/// One slice of a shared video or audio file.
+///
+/// The whole file is the ordered chunks for an asset. Clients subscribe to
+/// these rows and rebuild a local file for playback. Chunks stay small so a
+/// reducer can write them, and so a long clip does not arrive as one row.
+#[spacetimedb::table(accessor = asset_chunk, public)]
+pub struct AssetChunk {
+    #[primary_key]
+    pub id: String,
+    #[index(btree)]
+    pub project_id: String,
+    #[index(btree)]
+    pub asset_id: String,
+    pub chunk_index: u32,
+    pub chunk_count: u32,
+    pub bytes: Vec<u8>,
 }
 
 /// Ephemeral per-connection state: playhead, selection, cursor.

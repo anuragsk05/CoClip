@@ -9,7 +9,7 @@ use spacetimedb::{ConnectionId, Identity, ReducerContext, Table};
 
 use crate::schema::{
     ActorKind, EditHistory, EditOp, MemberRole, Project, ProjectMember, User, edit_history,
-    project, project_member, user,
+    collaborator, live_session, project, project_member, user,
 };
 
 pub struct Edit {
@@ -23,7 +23,7 @@ pub struct Edit {
 
 impl Edit {
     pub fn open(ctx: &ReducerContext, project_id: &str) -> Result<Self, String> {
-        let project = require_membership(ctx, project_id)?;
+        let project = require_can_write(ctx, project_id)?;
         let revision = project.revision + 1;
 
         ctx.db.project().id().update(Project {
@@ -93,6 +93,36 @@ fn require_membership(ctx: &ReducerContext, project_id: &str) -> Result<Project,
     Ok(project)
 }
 
+/// Members may watch. A view-only share link cannot change the timeline, even
+/// when the same person is an editor in another window.
+pub fn require_can_write(ctx: &ReducerContext, project_id: &str) -> Result<Project, String> {
+    let project = require_membership(ctx, project_id)?;
+    if let Some(connection_id) = ctx.connection_id() {
+        if let Some(person) = ctx.db.collaborator().connection_id().find(connection_id) {
+            if person.project_id != project_id || !person.can_write {
+                return Err("this share link is view-only".to_string());
+            }
+            return Ok(project);
+        }
+    }
+    // A guest with no collaborator row was removed, or the host ended the session.
+    // The host can still edit alone. Project creation also lands here, before a
+    // collaborator row exists.
+    if project.owner != ctx.sender() {
+        if let Some(session) = ctx.db.live_session().project_id().find(project_id.to_string()) {
+            if !session.active {
+                return Err("the host ended the CoClip session".to_string());
+            }
+            return Err("the host removed you from this session".to_string());
+        }
+    }
+    let role = membership(ctx, project_id, &ctx.sender()).map(|member| member.role);
+    if role == Some(MemberRole::Viewer) {
+        return Err("this share link is view-only".to_string());
+    }
+    Ok(project)
+}
+
 pub fn actor_kind(ctx: &ReducerContext) -> ActorKind {
     ctx.db
         .user()
@@ -102,14 +132,21 @@ pub fn actor_kind(ctx: &ReducerContext) -> ActorKind {
         .unwrap_or(ActorKind::Human)
 }
 
-/// Grants `identity` a role on a project, leaving an existing role untouched.
+/// Grants `identity` a role on a project, leaving an existing role untouched
+/// unless a write invite is upgrading a viewer to an editor.
 pub fn grant_membership(
     ctx: &ReducerContext,
     project_id: &str,
     identity: Identity,
     role: MemberRole,
 ) {
-    if membership(ctx, project_id, &identity).is_some() {
+    if let Some(existing) = membership(ctx, project_id, &identity) {
+        if existing.role == MemberRole::Viewer && role == MemberRole::Editor {
+            ctx.db.project_member().id().update(ProjectMember {
+                role,
+                ..existing
+            });
+        }
         return;
     }
     ctx.db.project_member().insert(ProjectMember {

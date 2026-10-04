@@ -12,6 +12,8 @@ import { Timeline } from "@/timeline/components";
 import { PreviewPanel } from "@/preview/components";
 import { EditorHeader } from "@/components/editor/editor-header";
 import { EditorProvider } from "@/components/providers/editor-provider";
+import { LiveCursors } from "@/collaboration/components/live-cursors";
+import { ViewOnlyBanner } from "@/collaboration/components/view-only-banner";
 import { Onboarding } from "@/components/editor/onboarding";
 import { MigrationDialog } from "@/project/components/migration-dialog";
 import { usePanelStore } from "@/editor/panel-store";
@@ -42,8 +44,9 @@ export default function Editor() {
 	return (
 		<MobileGate>
 			<EditorProvider projectId={projectId}>
-				<div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
+				<div className="bg-background relative flex h-screen w-screen flex-col overflow-hidden">
 					<DegradedRendererBanner />
+					<ViewOnlyBanner />
 					<EditorHeader />
 					<div className="min-h-0 min-w-0 flex-1">
 						<EditorLayout />
@@ -51,6 +54,7 @@ export default function Editor() {
 					<Onboarding />
 					<MigrationDialog />
 					<ChangelogNotification />
+					<LiveCursors />
 				</div>
 			</EditorProvider>
 		</MobileGate>

@@ -40,19 +40,25 @@ import AddSceneReducer from "./add_scene_reducer";
 import AddTrackReducer from "./add_track_reducer";
 import ClearPresenceReducer from "./clear_presence_reducer";
 import CreateProjectReducer from "./create_project_reducer";
+import CreateShareInviteReducer from "./create_share_invite_reducer";
 import DeclareAgentReducer from "./declare_agent_reducer";
 import DeleteClipReducer from "./delete_clip_reducer";
 import DeleteTrackReducer from "./delete_track_reducer";
 import JoinProjectReducer from "./join_project_reducer";
+import LeaveSessionReducer from "./leave_session_reducer";
 import MoveClipReducer from "./move_clip_reducer";
+import PutAssetChunkReducer from "./put_asset_chunk_reducer";
+import RefreshParticipantsReducer from "./refresh_participants_reducer";
 import RegisterAssetReducer from "./register_asset_reducer";
 import RemoveAssetReducer from "./remove_asset_reducer";
 import RemoveEffectReducer from "./remove_effect_reducer";
+import RemoveParticipantReducer from "./remove_participant_reducer";
 import RenameProjectReducer from "./rename_project_reducer";
 import ReorderEffectReducer from "./reorder_effect_reducer";
 import ReorderTrackReducer from "./reorder_track_reducer";
 import SetClipHiddenReducer from "./set_clip_hidden_reducer";
 import SetClipMutedReducer from "./set_clip_muted_reducer";
+import SetParticipantAccessReducer from "./set_participant_access_reducer";
 import SetPlayheadReducer from "./set_playhead_reducer";
 import SetProjectMetadataReducer from "./set_project_metadata_reducer";
 import SetSelectionReducer from "./set_selection_reducer";
@@ -61,6 +67,8 @@ import SetTrackMutedReducer from "./set_track_muted_reducer";
 import SetUserProfileReducer from "./set_user_profile_reducer";
 import SetVolumeReducer from "./set_volume_reducer";
 import SplitClipReducer from "./split_clip_reducer";
+import StartLiveSessionReducer from "./start_live_session_reducer";
+import StopLiveSessionReducer from "./stop_live_session_reducer";
 import ToggleEffectReducer from "./toggle_effect_reducer";
 import TrimClipReducer from "./trim_clip_reducer";
 import UpdateClipDataReducer from "./update_clip_data_reducer";
@@ -71,14 +79,18 @@ import UpdatePresenceReducer from "./update_presence_reducer";
 
 // Import all table schema definitions
 import AssetRow from "./asset_table";
+import AssetChunkRow from "./asset_chunk_table";
 import ClipRow from "./clip_table";
 import ClipEffectRow from "./clip_effect_table";
+import CollaboratorRow from "./collaborator_table";
 import EditHistoryRow from "./edit_history_table";
+import LiveSessionRow from "./live_session_table";
 import PresenceRow from "./presence_table";
 import ProjectRow from "./project_table";
 import ProjectMemberRow from "./project_member_table";
 import ProjectMetadataRow from "./project_metadata_table";
 import SceneRow from "./scene_table";
+import ShareInviteRow from "./share_invite_table";
 import TrackRow from "./track_table";
 import UserRow from "./user_table";
 
@@ -100,6 +112,23 @@ const tablesSchema = __schema({
       { name: 'asset_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AssetRow),
+  assetChunk: __table({
+    name: 'asset_chunk',
+    indexes: [
+      { accessor: 'asset_id', name: 'asset_chunk_asset_id_idx_btree', algorithm: 'btree', columns: [
+        'assetId',
+      ] },
+      { accessor: 'id', name: 'asset_chunk_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'project_id', name: 'asset_chunk_project_id_idx_btree', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'asset_chunk_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AssetChunkRow),
   clip: __table({
     name: 'clip',
     indexes: [
@@ -134,6 +163,20 @@ const tablesSchema = __schema({
       { name: 'clip_effect_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ClipEffectRow),
+  collaborator: __table({
+    name: 'collaborator',
+    indexes: [
+      { accessor: 'connection_id', name: 'collaborator_connection_id_idx_btree', algorithm: 'btree', columns: [
+        'connectionId',
+      ] },
+      { accessor: 'project_id', name: 'collaborator_project_id_idx_btree', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'collaborator_connection_id_key', constraint: 'unique', columns: ['connectionId'] },
+    ],
+  }, CollaboratorRow),
   editHistory: __table({
     name: 'edit_history',
     indexes: [
@@ -148,6 +191,17 @@ const tablesSchema = __schema({
       { name: 'edit_history_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EditHistoryRow),
+  liveSession: __table({
+    name: 'live_session',
+    indexes: [
+      { accessor: 'project_id', name: 'live_session_project_id_idx_btree', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_session_project_id_key', constraint: 'unique', columns: ['projectId'] },
+    ],
+  }, LiveSessionRow),
   presence: __table({
     name: 'presence',
     indexes: [
@@ -216,6 +270,20 @@ const tablesSchema = __schema({
       { name: 'scene_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, SceneRow),
+  shareInvite: __table({
+    name: 'share_invite',
+    indexes: [
+      { accessor: 'project_id', name: 'share_invite_project_id_idx_btree', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { accessor: 'token', name: 'share_invite_token_idx_btree', algorithm: 'btree', columns: [
+        'token',
+      ] },
+    ],
+    constraints: [
+      { name: 'share_invite_token_key', constraint: 'unique', columns: ['token'] },
+    ],
+  }, ShareInviteRow),
   track: __table({
     name: 'track',
     indexes: [
@@ -254,19 +322,25 @@ const reducersSchema = __reducers(
   __reducerSchema("add_track", AddTrackReducer),
   __reducerSchema("clear_presence", ClearPresenceReducer),
   __reducerSchema("create_project", CreateProjectReducer),
+  __reducerSchema("create_share_invite", CreateShareInviteReducer),
   __reducerSchema("declare_agent", DeclareAgentReducer),
   __reducerSchema("delete_clip", DeleteClipReducer),
   __reducerSchema("delete_track", DeleteTrackReducer),
   __reducerSchema("join_project", JoinProjectReducer),
+  __reducerSchema("leave_session", LeaveSessionReducer),
   __reducerSchema("move_clip", MoveClipReducer),
+  __reducerSchema("put_asset_chunk", PutAssetChunkReducer),
+  __reducerSchema("refresh_participants", RefreshParticipantsReducer),
   __reducerSchema("register_asset", RegisterAssetReducer),
   __reducerSchema("remove_asset", RemoveAssetReducer),
   __reducerSchema("remove_effect", RemoveEffectReducer),
+  __reducerSchema("remove_participant", RemoveParticipantReducer),
   __reducerSchema("rename_project", RenameProjectReducer),
   __reducerSchema("reorder_effect", ReorderEffectReducer),
   __reducerSchema("reorder_track", ReorderTrackReducer),
   __reducerSchema("set_clip_hidden", SetClipHiddenReducer),
   __reducerSchema("set_clip_muted", SetClipMutedReducer),
+  __reducerSchema("set_participant_access", SetParticipantAccessReducer),
   __reducerSchema("set_playhead", SetPlayheadReducer),
   __reducerSchema("set_project_metadata", SetProjectMetadataReducer),
   __reducerSchema("set_selection", SetSelectionReducer),
@@ -275,6 +349,8 @@ const reducersSchema = __reducers(
   __reducerSchema("set_user_profile", SetUserProfileReducer),
   __reducerSchema("set_volume", SetVolumeReducer),
   __reducerSchema("split_clip", SplitClipReducer),
+  __reducerSchema("start_live_session", StartLiveSessionReducer),
+  __reducerSchema("stop_live_session", StopLiveSessionReducer),
   __reducerSchema("toggle_effect", ToggleEffectReducer),
   __reducerSchema("trim_clip", TrimClipReducer),
   __reducerSchema("update_clip_data", UpdateClipDataReducer),
@@ -288,14 +364,20 @@ const proceduresSchema = __procedures(
 
 type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "tables"> & {
   tables: typeof tablesSchema.schemaType.tables & {
+    /** @deprecated Use `assetChunk` instead. This alias will be removed in the next major version. */
+    readonly "asset_chunk": Omit<typeof tablesSchema.schemaType.tables["assetChunk"], "accessorName"> & { readonly accessorName: "asset_chunk" };
     /** @deprecated Use `clipEffect` instead. This alias will be removed in the next major version. */
     readonly "clip_effect": Omit<typeof tablesSchema.schemaType.tables["clipEffect"], "accessorName"> & { readonly accessorName: "clip_effect" };
     /** @deprecated Use `editHistory` instead. This alias will be removed in the next major version. */
     readonly "edit_history": Omit<typeof tablesSchema.schemaType.tables["editHistory"], "accessorName"> & { readonly accessorName: "edit_history" };
+    /** @deprecated Use `liveSession` instead. This alias will be removed in the next major version. */
+    readonly "live_session": Omit<typeof tablesSchema.schemaType.tables["liveSession"], "accessorName"> & { readonly accessorName: "live_session" };
     /** @deprecated Use `projectMember` instead. This alias will be removed in the next major version. */
     readonly "project_member": Omit<typeof tablesSchema.schemaType.tables["projectMember"], "accessorName"> & { readonly accessorName: "project_member" };
     /** @deprecated Use `projectMetadata` instead. This alias will be removed in the next major version. */
     readonly "project_metadata": Omit<typeof tablesSchema.schemaType.tables["projectMetadata"], "accessorName"> & { readonly accessorName: "project_metadata" };
+    /** @deprecated Use `shareInvite` instead. This alias will be removed in the next major version. */
+    readonly "share_invite": Omit<typeof tablesSchema.schemaType.tables["shareInvite"], "accessorName"> & { readonly accessorName: "share_invite" };
   };
 };
 
@@ -314,10 +396,13 @@ const REMOTE_MODULE = {
 >;
 
 const tableAccessorAliases = {
+  "asset_chunk": "assetChunk",
   "clip_effect": "clipEffect",
   "edit_history": "editHistory",
+  "live_session": "liveSession",
   "project_member": "projectMember",
   "project_metadata": "projectMetadata",
+  "share_invite": "shareInvite",
 } as const;
 
 function __withTableAccessorAliases<T extends object>(target: T, freeze = false): T {
@@ -338,26 +423,38 @@ function __withTableAccessorAliases<T extends object>(target: T, freeze = false)
 
 type __DbViewBase = __DbConnectionImpl<typeof REMOTE_MODULE>["db"];
 export type DbView = __DbViewBase & {
+  /** @deprecated Use `assetChunk` instead. This alias will be removed in the next major version. */
+  readonly "asset_chunk": __DbViewBase["assetChunk"];
   /** @deprecated Use `clipEffect` instead. This alias will be removed in the next major version. */
   readonly "clip_effect": __DbViewBase["clipEffect"];
   /** @deprecated Use `editHistory` instead. This alias will be removed in the next major version. */
   readonly "edit_history": __DbViewBase["editHistory"];
+  /** @deprecated Use `liveSession` instead. This alias will be removed in the next major version. */
+  readonly "live_session": __DbViewBase["liveSession"];
   /** @deprecated Use `projectMember` instead. This alias will be removed in the next major version. */
   readonly "project_member": __DbViewBase["projectMember"];
   /** @deprecated Use `projectMetadata` instead. This alias will be removed in the next major version. */
   readonly "project_metadata": __DbViewBase["projectMetadata"];
+  /** @deprecated Use `shareInvite` instead. This alias will be removed in the next major version. */
+  readonly "share_invite": __DbViewBase["shareInvite"];
 };
 
 type __TablesBase = __QueryBuilder<typeof tablesSchema.schemaType>;
 export type Tables = __TablesBase & {
+  /** @deprecated Use `assetChunk` instead. This alias will be removed in the next major version. */
+  readonly "asset_chunk": __TablesBase["assetChunk"];
   /** @deprecated Use `clipEffect` instead. This alias will be removed in the next major version. */
   readonly "clip_effect": __TablesBase["clipEffect"];
   /** @deprecated Use `editHistory` instead. This alias will be removed in the next major version. */
   readonly "edit_history": __TablesBase["editHistory"];
+  /** @deprecated Use `liveSession` instead. This alias will be removed in the next major version. */
+  readonly "live_session": __TablesBase["liveSession"];
   /** @deprecated Use `projectMember` instead. This alias will be removed in the next major version. */
   readonly "project_member": __TablesBase["projectMember"];
   /** @deprecated Use `projectMetadata` instead. This alias will be removed in the next major version. */
   readonly "project_metadata": __TablesBase["projectMetadata"];
+  /** @deprecated Use `shareInvite` instead. This alias will be removed in the next major version. */
+  readonly "share_invite": __TablesBase["shareInvite"];
 };
 
 /** The tables available in this remote SpacetimeDB module. Each table reference doubles as a query builder. */
