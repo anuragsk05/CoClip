@@ -58,15 +58,16 @@ export function Header() {
 				<div className="relative z-10 flex items-center gap-7">
 					<ContextMenu>
 						<ContextMenuTrigger asChild>
-							<Link href="/" className="flex items-center gap-2.5 group">
+							<Link href="/" className="inline-flex items-center gap-2.5 group">
 								<Image
 									src={DEFAULT_LOGO_URL}
 									alt="CoClip"
 									width={1254}
 									height={657}
-									className="h-7 w-auto rounded-md transition-transform group-hover:scale-105"
+									className="block h-7 w-auto shrink-0 object-contain transition-transform group-hover:scale-105"
+									style={{ width: "auto", height: "1.75rem" }}
 								/>
-								<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
+								<span className="text-lg font-bold leading-none tracking-tight bg-linear-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
 									CoClip
 								</span>
 							</Link>

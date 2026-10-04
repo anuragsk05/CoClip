@@ -15,6 +15,7 @@ import {
 } from "@opencut/collab-client";
 
 import type { EditorCore } from "@/core";
+import { getMediaTypeFromFile, playableMimeType } from "@/media/media-utils";
 import { processMediaAssets } from "@/media/processing";
 import type { MediaAsset } from "@/media/types";
 import { storageService } from "@/services/storage/service";
@@ -82,7 +83,7 @@ export function watchSharedMedia({
 				continue;
 			}
 			const local = editor.media.getAssets().find((item) => item.id === asset.id);
-			if (local && asset.byteSize != null && local.file.size === asset.byteSize) {
+			if (hasPlayableCopy(local, asset.byteSize)) {
 				continue;
 			}
 			const bytes = assembleMediaChunks(session.assetChunks(asset.id));
@@ -103,9 +104,13 @@ export function watchSharedMedia({
 		}
 	};
 
-	const stop = session.onAssetChunks(receive);
+	const stopChunks = session.onAssetChunks(receive);
+	const stopSnapshot = session.onSnapshot(() => receive());
 	receive();
-	return stop;
+	return () => {
+		stopChunks();
+		stopSnapshot();
+	};
 }
 
 async function saveReceivedFile({
@@ -124,7 +129,7 @@ async function saveReceivedFile({
 	bytes: Uint8Array<ArrayBuffer>;
 }): Promise<void> {
 	const file = new File([bytes], name, {
-		type: mimeType || "application/octet-stream",
+		type: playableMimeType({ name, mimeType }),
 	});
 	const [processed] = await processMediaAssets({ files: [file] });
 	if (!processed) {
@@ -135,6 +140,19 @@ async function saveReceivedFile({
 	editor.media.setAssets({ assets: [...others, media] });
 	await storageService.saveMediaAsset({ projectId, mediaAsset: media });
 	toast.success(`${name} is ready to play`);
+}
+
+function hasPlayableCopy(
+	local: MediaAsset | undefined,
+	byteSize: number | null,
+): boolean {
+	if (!local?.url || !local.file || local.file.size === 0) {
+		return false;
+	}
+	if (byteSize != null && local.file.size !== byteSize) {
+		return false;
+	}
+	return getMediaTypeFromFile({ file: local.file }) != null;
 }
 
 function chunksMatchFile(session: CollabSession, asset: MediaAsset): boolean {

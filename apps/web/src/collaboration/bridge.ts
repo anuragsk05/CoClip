@@ -18,6 +18,7 @@ import type {
 } from "@opencut/collab-client";
 
 import type { EditorCore } from "@/core";
+import { playableMimeType } from "@/media/media-utils";
 import type { MediaAsset } from "@/media/types";
 import type { TProject } from "@/project/types";
 import type { SceneTracks } from "@/timeline";
@@ -326,7 +327,10 @@ function toCollabAsset(asset: MediaAsset): CollabAsset {
 		// Video and audio bytes are uploaded as chunks. Anything else stays a
 		// local id, which only this browser can resolve.
 		location: asset.type === "video" || asset.type === "audio" ? "chunks" : asset.id,
-		mimeType: asset.file?.type ?? "application/octet-stream",
+		mimeType: playableMimeType({
+			name: asset.name,
+			mimeType: asset.file?.type ?? "",
+		}),
 		byteSize: asset.file?.size ?? null,
 		width: asset.width ?? null,
 		height: asset.height ?? null,
