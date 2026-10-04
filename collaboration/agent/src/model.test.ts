@@ -199,3 +199,56 @@ test("rejects stale selection before asking the model or editing", async () => {
 		}),
 	).rejects.toThrow("selected scene no longer");
 });
+
+test("includes follow-up memory and editing playbook without replaying old operations", async () => {
+	let request: Record<string, unknown> = {};
+	let toolCalls = 0;
+	globalThis.fetch = (async (_url, init) => {
+		request = JSON.parse(String(init?.body));
+		return Response.json({
+			candidates: [
+				{
+					content: {
+						role: "model",
+						parts: [{ text: "Which clip should I change?" }],
+					},
+				},
+			],
+		});
+	}) as typeof fetch;
+	const agent = {
+		describe: () => "Current timeline: photo-b is visible",
+		call: async () => {
+			toolCalls++;
+		},
+	} as unknown as CollabAgent;
+	await runAgent({
+		agent,
+		apiKey: "test-key",
+		prompt: "Do the same again",
+		history: [
+			{ role: "user", text: "Hide photo-a" },
+			{ role: "agent", text: "Hidden photo-a." },
+		],
+	});
+	const contents = request.contents as Array<{
+		role: string;
+		parts: Array<{ text: string }>;
+	}>;
+	expect(contents[0]).toEqual({
+		role: "user",
+		parts: [{ text: "Hide photo-a" }],
+	});
+	expect(contents[1]).toEqual({
+		role: "model",
+		parts: [{ text: "Hidden photo-a." }],
+	});
+	expect(contents[2]?.parts[0]?.text).toContain(
+		"Current timeline: photo-b is visible",
+	);
+	expect(JSON.stringify(request)).toContain("Earlier chat is background");
+	expect(JSON.stringify(request)).toContain(
+		"setting trimStart/trimEnd alone does not change duration",
+	);
+	expect(toolCalls).toBe(0);
+});

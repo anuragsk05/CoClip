@@ -14,6 +14,7 @@ export {
 	ticksFromSeconds,
 } from "./types";
 export type {
+	ChatMessage,
 	ActorKind,
 	AssetStorage,
 	MemberRole,

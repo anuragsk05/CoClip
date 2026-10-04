@@ -68,6 +68,16 @@ export const AssetStorage = __t.enum("AssetStorage", {
 });
 export type AssetStorage = __Infer<typeof AssetStorage>;
 
+export const ChatMessage = __t.object("ChatMessage", {
+  id: __t.u64(),
+  projectId: __t.string(),
+  author: __t.identity(),
+  authorName: __t.string(),
+  text: __t.string(),
+  sentAt: __t.timestamp(),
+});
+export type ChatMessage = __Infer<typeof ChatMessage>;
+
 export const Clip = __t.object("Clip", {
   id: __t.string(),
   projectId: __t.string(),

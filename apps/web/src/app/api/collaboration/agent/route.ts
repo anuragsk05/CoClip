@@ -4,8 +4,13 @@ import {
 	CollabAgent,
 	runAgent,
 	parsePromptContext,
+	parseConversation,
 } from "@opencut/collab-agent";
-import type { AgentMode, PromptContext } from "@opencut/collab-agent";
+import type {
+	AgentMode,
+	PromptContext,
+	ConversationTurn,
+} from "@opencut/collab-agent";
 
 export const runtime = "nodejs";
 // Hobby projects on Fluid Compute allow 300s. Sixty seconds is what the
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
 			prompt: parsed.prompt,
 			mode: parsed.mode,
 			context: parsed.context,
+			history: parsed.history,
 			apiKey,
 		});
 		return NextResponse.json(outcome);
@@ -94,14 +100,13 @@ function agentErrorMessage(error: unknown): string {
 	return message;
 }
 
-function parseBody(
-	body: unknown,
-):
+function parseBody(body: unknown):
 	| {
 			projectId: string;
 			prompt: string;
 			mode: AgentMode;
 			context?: PromptContext;
+			history: ConversationTurn[];
 	  }
 	| string {
 	if (typeof body !== "object" || body === null) {
@@ -121,5 +126,7 @@ function parseBody(
 
 	const context = parsePromptContext(record.context);
 	if (typeof context === "string") return context;
-	return { projectId, prompt: prompt.trim(), mode, context };
+	const history = parseConversation(record.history);
+	if (typeof history === "string") return history;
+	return { projectId, prompt: prompt.trim(), mode, context, history };
 }

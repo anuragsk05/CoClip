@@ -242,3 +242,11 @@ export type EditorCommand =
 	| { kind: "removeAsset"; assetId: string };
 
 export type NewClip = Omit<CollabClip, "revision">;
+
+export interface ChatMessage {
+	id: string;
+	author: string;
+	authorName: string;
+	text: string;
+	sentAt: Date;
+}

@@ -24,12 +24,19 @@ export interface ClipView {
 	duration: number;
 	/** Seconds into the source media that this clip begins at. */
 	sourceOffset: number;
+	trimEnd: number;
+	sourceDuration: number | null;
 	mediaId: string | null;
 	rate: number;
 	volumeDb: number;
 	muted: boolean;
 	hidden: boolean;
-	effects: { id: string; type: string; enabled: boolean }[];
+	effects: {
+		id: string;
+		type: string;
+		enabled: boolean;
+		params: Record<string, unknown>;
+	}[];
 }
 
 export interface TrackView {
@@ -104,6 +111,11 @@ export function toProjectView({
 						end: start + duration,
 						duration,
 						sourceOffset: secondsFromTicks(clip.trimStart),
+						trimEnd: secondsFromTicks(clip.trimEnd),
+						sourceDuration:
+							clip.sourceDuration === null
+								? null
+								: secondsFromTicks(clip.sourceDuration),
 						mediaId: clip.mediaId,
 						rate: clip.rate,
 						volumeDb: clip.volumeDb,
@@ -115,6 +127,7 @@ export function toProjectView({
 								id: effect.id,
 								type: effect.effectType,
 								enabled: effect.enabled,
+								params: effect.params,
 							})),
 					};
 				});
@@ -200,12 +213,13 @@ export function describeProject(view: ProjectView): string {
 
 		for (const clip of track.clips) {
 			const notes = [
+				`trimStart=${clip.sourceOffset}s, trimEnd=${clip.trimEnd}s, sourceDuration=${clip.sourceDuration === null ? "unknown" : `${clip.sourceDuration}s`}`,
 				clip.rate !== 1 && `${clip.rate}x`,
 				clip.volumeDb !== 0 && `${clip.volumeDb}dB`,
 				clip.muted && "muted",
 				clip.hidden && "hidden",
 				clip.effects.length > 0 &&
-					`effects: ${clip.effects.map((effect) => effect.type).join(", ")}`,
+					`effects: ${clip.effects.map((effect) => `${effect.id}:${effect.type} ${effect.enabled ? "enabled" : "disabled"} params=${JSON.stringify(effect.params)}`).join(", ")}`,
 			].filter(Boolean);
 
 			lines.push(

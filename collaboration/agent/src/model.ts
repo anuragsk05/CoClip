@@ -20,6 +20,8 @@ import {
 } from "@google/genai";
 
 import type { CollabAgent, ToolResult } from "./agent";
+import { EDITING_INSTRUCTIONS } from "./instructions";
+import { parseConversation, type ConversationTurn } from "./conversation";
 import { TOOLS } from "./tools";
 import { parsePromptContext, type PromptContext } from "./prompt-context";
 
@@ -36,6 +38,7 @@ export interface RunOptions {
 	agent: CollabAgent;
 	prompt: string;
 	context?: PromptContext;
+	history?: ConversationTurn[];
 	mode?: AgentMode;
 	apiKey?: string;
 	model?: string;
@@ -67,6 +70,8 @@ Rules:
 - After you are done, reply in one or two short sentences saying what changed.`;
 
 export async function runAgent(options: RunOptions): Promise<RunOutcome> {
+	const history = parseConversation(options.history);
+	if (typeof history === "string") throw new Error(history);
 	const context = parsePromptContext(options.context);
 	if (typeof context === "string") throw new Error(context);
 	if (context) {
@@ -106,6 +111,12 @@ export async function runAgent(options: RunOptions): Promise<RunOutcome> {
 	};
 
 	const contents: Content[] = [
+		...history.map(
+			(turn): Content => ({
+				role: turn.role === "agent" ? "model" : "user",
+				parts: [{ text: turn.text }],
+			}),
+		),
 		{
 			role: "user",
 			parts: [
@@ -126,7 +137,7 @@ export async function runAgent(options: RunOptions): Promise<RunOutcome> {
 			model,
 			contents,
 			config: {
-				systemInstruction: SYSTEM,
+				systemInstruction: `${SYSTEM}\n${EDITING_INSTRUCTIONS}`,
 				tools: [{ functionDeclarations: toDeclarations() }],
 				toolConfig: {
 					functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO },

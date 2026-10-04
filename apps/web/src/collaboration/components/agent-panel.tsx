@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+	MAX_CONVERSATION_TURNS,
+	MAX_TURN_CHARS,
+	type ConversationTurn,
+} from "@opencut/collab-agent/conversation";
 import { SparklesIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -59,6 +64,10 @@ export function AgentPanel() {
 	const [prompt, setPrompt] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [lines, setLines] = useState<ChatLine[]>([]);
+	const memoryRef = useRef<{ projectId: string; turns: ConversationTurn[] }>({
+		projectId,
+		turns: [],
+	});
 	const conversationRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -97,6 +106,9 @@ export function AgentPanel() {
 				time: editor.playback.getCurrentTime(),
 			}),
 		};
+		if (memoryRef.current.projectId !== projectId)
+			memoryRef.current = { projectId, turns: [] };
+		const history = memoryRef.current.turns;
 		setPrompt("");
 		setBusy(true);
 		setLines((current) => [...current, { role: "user", text }]);
@@ -105,7 +117,13 @@ export function AgentPanel() {
 			const response = await fetch("/api/collaboration/agent", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ projectId, prompt: text, mode, context }),
+				body: JSON.stringify({
+					projectId,
+					prompt: text,
+					mode,
+					context,
+					history,
+				}),
 			});
 			const raw = await response.text();
 			let payload: AgentResponse;
@@ -134,6 +152,24 @@ export function AgentPanel() {
 				return;
 			}
 
+			memoryRef.current = {
+				projectId,
+				turns: [
+					...history,
+					{
+						role: "user" as const,
+						text: `${text}\nContext at that time: scene=${context.sceneId}; selected=${context.selectedClipIds.slice(0, 20).join(",")}`.slice(
+							0,
+							MAX_TURN_CHARS,
+						),
+					},
+					{
+						role: "agent" as const,
+						text:
+							(payload.reply ?? "Done.").slice(0, MAX_TURN_CHARS) || "Done.",
+					},
+				].slice(-MAX_CONVERSATION_TURNS),
+			};
 			const extras =
 				payload.events
 					?.filter((event) => event.type === "tool" && event.name)
@@ -215,6 +251,7 @@ export function AgentPanel() {
 					</p>
 				)}
 				<Textarea
+					maxLength={2000}
 					aria-label={mode === "goal" ? "Agent goal" : "Agent prompt"}
 					value={prompt}
 					onChange={(event) => setPrompt(event.target.value)}
