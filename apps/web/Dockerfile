@@ -59,5 +59,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-
 CMD ["bun", "apps/web/server.js"]
