@@ -48,20 +48,25 @@ export function MobileGate({ children }: MobileGateProps) {
 
 			<div className="flex flex-1 flex-col justify-center gap-5 px-7">
 				<div className="flex flex-col gap-3">
+					<div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-2">
+						<span className="text-xl">🖥️</span>
+					</div>
 					<h1 className="text-foreground text-3xl font-bold tracking-tight">
-						Desktop only (for now)
+						Desktop Studio Recommended
 					</h1>
-					<p className="text-muted-foreground text-sm leading-relaxed">
-						OpenCut isn't optimized for mobile or iPad yet. Things will break
-						and the layout will be a mess. Come back on a desktop for the real
-						experience.
+					<p className="text-muted-foreground text-sm leading-relaxed max-w-md">
+						CoClip Studio offers an extensive multi-track timeline designed for
+						high-precision editing and keyboard workflows. For the best experience,
+						we recommend accessing the studio from a desktop browser.
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<Button onClick={handleContinue}>Take a look anyway</Button>
+					<Button variant="primary" onClick={handleContinue} className="shadow-md shadow-primary/20">
+						Continue to Studio
+					</Button>
 					<Button variant="ghost" asChild>
-						<Link href="/roadmap" className="flex items-center gap-1">
-							Roadmap
+						<Link href="/" className="flex items-center gap-1">
+							Return Home
 							<HugeiconsIcon icon={ArrowRight01Icon} size={14} />
 						</Link>
 					</Button>

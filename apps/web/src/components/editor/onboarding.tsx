@@ -28,13 +28,13 @@ export function Onboarding() {
 	const getStepTitle = () => {
 		switch (step) {
 			case 0:
-				return "Welcome to OpenCut Beta! 🎉";
+				return "Welcome to CoClip Studio";
 			case 1:
-				return "⚠️ This is a super early beta!";
+				return "Powerful Creative Tools";
 			case 2:
-				return "🦋 Have fun testing!";
+				return "Ready to Create";
 			default:
-				return "OpenCut Onboarding";
+				return "CoClip Studio";
 		}
 	};
 
@@ -42,36 +42,62 @@ export function Onboarding() {
 		switch (step) {
 			case 0:
 				return (
-					<div className="space-y-5">
-						<div className="space-y-3">
-							<Title title="Welcome to OpenCut Beta! 🎉" />
-							<Description description="You're among the first to try OpenCut - the fully open source CapCut alternative." />
+					<div className="space-y-6 py-2">
+						<div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary">
+							<span className="text-xl">✨</span>
 						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
+						<div className="space-y-2">
+							<Title title="Welcome to CoClip Studio" />
+							<Description description="A high-performance creative video editor designed right in your browser. Fast, fluid, and built for modern creator workflows." />
+						</div>
+						<div className="flex items-center justify-between pt-2">
+							<div className="flex gap-1.5">
+								<span className="size-2 rounded-full bg-primary" />
+								<span className="size-2 rounded-full bg-muted" />
+								<span className="size-2 rounded-full bg-muted" />
+							</div>
+							<NextButton onClick={handleNext}>Explore Studio</NextButton>
+						</div>
 					</div>
 				);
 			case 1:
 				return (
-					<div className="space-y-5">
-						<div className="space-y-3">
-							<Title title={getStepTitle()} />
-							<Description description="There's still a ton of things to do to make this editor amazing." />
-							<Description description="A lot of features are still missing. We're working hard to build them out!" />
-							<Description description="If you're curious, check out our roadmap [here](https://opencut.app/roadmap)" />
+					<div className="space-y-6 py-2">
+						<div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary">
+							<span className="text-xl">⚡</span>
 						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
+						<div className="space-y-2">
+							<Title title="Powerful Creative Suite" />
+							<Description description="Layer multiple video and audio tracks, customize typography, apply filters, and compose effects seamlessly with instant playback." />
+						</div>
+						<div className="flex items-center justify-between pt-2">
+							<div className="flex gap-1.5">
+								<span className="size-2 rounded-full bg-muted" />
+								<span className="size-2 rounded-full bg-primary" />
+								<span className="size-2 rounded-full bg-muted" />
+							</div>
+							<NextButton onClick={handleNext}>Continue</NextButton>
+						</div>
 					</div>
 				);
 			case 2:
 				return (
-					<div className="space-y-5">
-						<div className="space-y-3">
-							<Title title={getStepTitle()} />
-							<Description
-								description={`Join our [Discord](${SOCIAL_LINKS.discord}), chat with cool people and share feedback to help make OpenCut the best editor ever.`}
-							/>
+					<div className="space-y-6 py-2">
+						<div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary">
+							<span className="text-xl">🎬</span>
 						</div>
-						<NextButton onClick={handleClose}>Finish</NextButton>
+						<div className="space-y-2">
+							<Title title="Ready to Create" />
+							<Description description="Drag and drop your media files into the assets drawer or directly onto the timeline to begin your project." />
+						</div>
+						<div className="flex items-center justify-between pt-2">
+							<div className="flex gap-1.5">
+								<span className="size-2 rounded-full bg-muted" />
+								<span className="size-2 rounded-full bg-muted" />
+								<span className="size-2 rounded-full bg-primary" />
+							</div>
+							<NextButton onClick={handleClose}>Start Editing</NextButton>
+						</div>
 					</div>
 				);
 			default:
@@ -81,7 +107,7 @@ export function Onboarding() {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={handleClose}>
-			<DialogContent className="sm:max-w-[425px]">
+			<DialogContent className="sm:max-w-[440px] border-border/80 bg-background/95 backdrop-blur-xl shadow-2xl shadow-primary/10">
 				<DialogTitle>
 					<span className="sr-only">{getStepTitle()}</span>
 				</DialogTitle>
@@ -127,7 +153,7 @@ function NextButton({
 	onClick: () => void;
 }) {
 	return (
-		<Button onClick={onClick} variant="default" className="w-full">
+		<Button onClick={onClick} variant="primary" className="rounded-lg shadow-md shadow-primary/20 hover:shadow-primary/30">
 			{children}
 			<ArrowRightIcon className="size-4" />
 		</Button>

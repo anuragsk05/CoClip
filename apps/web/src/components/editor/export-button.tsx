@@ -66,7 +66,7 @@ export function ExportButton() {
 				<button
 					type="button"
 					className={cn(
-						"flex items-center gap-1.5 rounded-md bg-[#38BDF8] px-[0.12rem] py-[0.12rem] text-white",
+						"flex items-center gap-1.5 rounded-lg bg-primary/30 p-[1px] text-white transition-all duration-150 hover:bg-primary/50",
 						hasProject ? "cursor-pointer" : "cursor-not-allowed opacity-50",
 					)}
 					onClick={hasProject ? () => setIsExportPopoverOpen(true) : undefined}
@@ -78,12 +78,9 @@ export function ExportButton() {
 						}
 					}}
 				>
-					<div className="relative flex items-center gap-1.5 rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7] px-4 py-1 shadow-[0_1px_3px_0px_rgba(0,0,0,0.65)]">
-						<HugeiconsIcon icon={TransitionTopIcon} className="z-50 size-3.5" />
-						<span className="z-50 text-[0.875rem]">Export</span>
-						<div className="absolute top-0 left-0 z-10 flex size-full items-center justify-center rounded-[0.6rem] bg-linear-to-t from-white/0 to-white/50">
-							<div className="absolute top-[0.08rem] z-50 h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7]"></div>
-						</div>
+					<div className="relative flex items-center gap-1.5 rounded-[calc(var(--radius-md)-2px)] bg-linear-to-r from-primary via-purple-600 to-indigo-600 px-3.5 py-1 text-white shadow-md shadow-primary/20 transition-all hover:brightness-105 active:scale-95">
+						<HugeiconsIcon icon={TransitionTopIcon} className="size-3.5 text-white" />
+						<span className="text-xs font-semibold tracking-wide">Export</span>
 					</div>
 				</button>
 			</PopoverTrigger>
@@ -253,7 +250,7 @@ function ExportPopover({
 								</div>
 
 								<div className="p-3 pt-0">
-									<Button onClick={handleExport} className="w-full gap-2">
+									<Button variant="primary" onClick={handleExport} className="w-full gap-2 shadow-sm shadow-primary/20">
 										<Download className="size-4" />
 										Export
 									</Button>

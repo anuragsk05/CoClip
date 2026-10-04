@@ -31,7 +31,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Bookmark02Icon,
 	Delete02Icon,
-	SnowIcon,
 	ScissorIcon,
 	MagnetIcon,
 	SearchAddIcon,
@@ -181,13 +180,6 @@ function ToolbarLeftSection() {
 					onClick={({ event }) =>
 						handleAction({ action: "duplicate-selected", event })
 					}
-				/>
-
-				<ToolbarButton
-					icon={<HugeiconsIcon icon={SnowIcon} />}
-					tooltip="Freeze frame (coming soon)"
-					disabled={true}
-					onClick={({ event: _event }) => {}}
 				/>
 
 				<ToolbarButton

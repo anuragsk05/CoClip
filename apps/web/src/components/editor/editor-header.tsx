@@ -33,8 +33,8 @@ import { useCollaborationState } from "@/collaboration/collaboration-provider";
 
 export function EditorHeader() {
 	return (
-		<header className="bg-background flex h-[3.4rem] items-center justify-between px-3 pt-0.5">
-			<div className="flex items-center gap-1">
+		<header className="bg-background/90 backdrop-blur-md border-b border-border/50 flex h-[3.4rem] items-center justify-between px-3.5 z-20">
+			<div className="flex items-center gap-1.5">
 				<ProjectDropdown />
 				<EditableProjectName />
 			</div>
@@ -132,10 +132,10 @@ function ProjectDropdown() {
 					<Button variant="ghost" size="icon" className="p-1 rounded-sm size-8">
 						<Image
 							src={DEFAULT_LOGO_URL}
-							alt="Project thumbnail"
+							alt="CoClip"
 							width={32}
 							height={32}
-							className="invert dark:invert-0 size-5"
+							className="size-5 rounded-sm"
 						/>
 					</Button>
 				</DropdownMenuTrigger>

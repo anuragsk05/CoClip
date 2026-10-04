@@ -33,9 +33,14 @@ export function PropertiesPanel() {
 	if (selectedElements.length > 1) {
 		return (
 			<div className="panel bg-background flex h-full flex-col items-center justify-center overflow-hidden rounded-sm border">
-				<p className="text-muted-foreground text-sm">
-					{selectedElements.length} elements selected.0
-				</p>
+				<div className="flex flex-col items-center gap-2 p-6 text-center select-none">
+					<p className="text-sm font-semibold text-foreground">
+						{selectedElements.length} elements selected
+					</p>
+					<p className="text-muted-foreground text-xs max-w-[200px]">
+						Select a single element to view and configure its parameters
+					</p>
+				</div>
 			</div>
 		);
 	}

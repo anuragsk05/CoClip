@@ -7,13 +7,13 @@ import { EXTERNAL_TOOLS } from "@/site/external-tools";
 import { BasePage } from "../base-page";
 
 export const metadata: Metadata = {
-	title: "Contributors - OpenCut",
+	title: "Contributors - CoClip",
 	description:
-		"Meet the amazing people who contribute to OpenCut, the free and open-source video editor.",
+		"Meet the amazing people who contribute to CoClip, the modern open-source video editor.",
 	openGraph: {
-		title: "Contributors - OpenCut",
+		title: "Contributors - CoClip",
 		description:
-			"Meet the amazing people who contribute to OpenCut, the free and open-source video editor.",
+			"Meet the amazing people who contribute to CoClip, the modern open-source video editor.",
 		type: "website",
 	},
 };
@@ -34,7 +34,7 @@ async function getContributors(): Promise<Contributor[]> {
 			{
 				headers: {
 					Accept: "application/vnd.github.v3+json",
-					"User-Agent": "OpenCut-Web-App",
+					"User-Agent": "CoClip-Web-App",
 				},
 				next: { revalidate: 600 }, // 10 minutes
 			},
@@ -70,7 +70,7 @@ export default async function ContributorsPage() {
 	return (
 		<BasePage
 			title="Contributors"
-			description="Meet the amazing people who contribute to OpenCut, the free and open-source video editor."
+			description="Meet the amazing people who contribute to CoClip, the modern open-source video editor."
 		>
 			<div className="-mt-4 flex items-center justify-center gap-8 text-sm">
 				<StatItem value={contributors.length} label="contributors" />
@@ -87,7 +87,7 @@ export default async function ContributorsPage() {
 				<ExternalToolsSection />
 				<GitHubContributeSection
 					title="Join the community"
-					description="OpenCut is built by developers like you. Every contribution, no matter how small, helps make video editing more accessible for everyone."
+					description="CoClip is built by creators and developers like you. Every contribution helps make video editing faster and more accessible for everyone."
 				/>
 			</div>
 		</BasePage>
@@ -169,7 +169,7 @@ function AllContributorsSection({
 			<div className="flex flex-col gap-2 text-center">
 				<h2 className="text-2xl font-semibold">All contributors</h2>
 				<p className="text-muted-foreground">
-					Everyone who makes OpenCut better
+					Everyone who makes CoClip better
 				</p>
 			</div>
 
@@ -211,7 +211,7 @@ function ExternalToolsSection() {
 		<div className="flex flex-col gap-10">
 			<div className="flex flex-col gap-2 text-center">
 				<h2 className="text-2xl font-semibold">External tools</h2>
-				<p className="text-muted-foreground">Tools we use to build OpenCut</p>
+				<p className="text-muted-foreground">Tools we use to build CoClip</p>
 			</div>
 
 			<div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2">
