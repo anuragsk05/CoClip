@@ -21,6 +21,7 @@ import type { EditorCore } from "@/core";
 import { playableMimeType } from "@/media/media-utils";
 import type { MediaAsset } from "@/media/types";
 import type { TProject } from "@/project/types";
+import { storageService } from "@/services/storage/service";
 import type { SceneTracks } from "@/timeline";
 import { mediaTimeFromSeconds } from "@/wasm";
 
@@ -253,10 +254,11 @@ export class CollaborationBridge {
 		);
 	}
 
-	/** Saves video and audio that other editors have uploaded into this session. */
+	/** Saves media that other editors have uploaded into this session. */
 	#followSharedMedia(): void {
-		const projectId = this.#editor.project.getActiveOrNull()?.metadata.id;
-		if (!projectId) {
+		const projectId = this.#session.projectId;
+		const localProjectId = this.#editor.project.getActiveOrNull()?.metadata.id;
+		if (!localProjectId || localProjectId !== projectId) {
 			return;
 		}
 		const sync = watchSharedMedia({
@@ -306,22 +308,37 @@ export class CollaborationBridge {
 
 	async #removeWhenUnused(assetId: string): Promise<void> {
 		await this.#sceneWrites;
-		for (let attempt = 0; attempt < 12; attempt += 1) {
+		const clipIds = this.#session
+			.snapshot()
+			.clips.filter((clip) => clip.mediaId === assetId)
+			.map((clip) => clip.id);
+		for (const clipId of clipIds) {
 			try {
-				await this.#session.dispatch({ kind: "removeAsset", assetId });
-				return;
+				await this.#session.dispatch({ kind: "deleteClip", clipId });
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				if (message.includes("unknown asset")) {
-					return;
-				}
-				if (!message.includes("still used") || attempt === 11) {
+				if (!message.includes("unknown clip") && !message.includes("does not belong")) {
 					this.#onError(asError(error));
-					return;
 				}
-				await new Promise((resolve) => setTimeout(resolve, 250));
 			}
 		}
+
+		try {
+			await this.#session.dispatch({ kind: "removeAsset", assetId });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (message.includes("unknown asset")) {
+				return;
+			}
+			this.#onError(asError(error));
+			return;
+		}
+
+		await storageService
+			.deleteMediaAsset({ projectId: this.#session.projectId, id: assetId })
+			.catch((error: unknown) => {
+				console.error("Failed to delete media item:", error);
+			});
 	}
 
 	/** Publishes this editor's local project as the shared one. */

@@ -6,7 +6,9 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table};
 
 use crate::edit::{require_can_write, Edit};
-use crate::schema::{Asset, AssetChunk, AssetStorage, EditOp, asset, asset_chunk, clip};
+use crate::schema::{
+    Asset, AssetChunk, AssetStorage, EditOp, asset, asset_chunk, clip, clip_effect,
+};
 
 /// Largest slice accepted by [`put_asset_chunk`].
 pub const MAX_CHUNK_BYTES: usize = 256 * 1024;
@@ -81,7 +83,7 @@ pub fn register_asset(
     Ok(())
 }
 
-/// Removes an asset reference once no clip uses it.
+/// Removes one project's asset, the clips in that project that use it, and its bytes.
 #[spacetimedb::reducer]
 pub fn remove_asset(
     ctx: &ReducerContext,
@@ -99,18 +101,10 @@ pub fn remove_asset(
         return Err(format!("asset `{asset_id}` belongs to another project"));
     }
 
-    let in_use = ctx
-        .db
-        .clip()
-        .project_id()
-        .filter(&project_id)
-        .any(|clip| clip.media_id.as_deref() == Some(asset_id.as_str()));
-    if in_use {
-        return Err(format!("asset `{asset_id}` is still used by a clip"));
-    }
+    delete_project_clips_using_asset(ctx, &project_id, &asset_id);
 
     let name = existing.name.clone();
-    delete_asset_chunks(ctx, &asset_id);
+    delete_asset_chunks(ctx, &project_id, &asset_id);
     ctx.db.asset().id().delete(asset_id.clone());
 
     edit.record(
@@ -192,12 +186,39 @@ pub fn put_asset_chunk(
     }
 }
 
-fn delete_asset_chunks(ctx: &ReducerContext, asset_id: &str) {
+fn delete_project_clips_using_asset(ctx: &ReducerContext, project_id: &str, asset_id: &str) {
+    let clip_ids: Vec<String> = ctx
+        .db
+        .clip()
+        .project_id()
+        .filter(&project_id.to_string())
+        .filter(|clip| clip.media_id.as_deref() == Some(asset_id))
+        .map(|clip| clip.id.clone())
+        .collect();
+
+    for clip_id in clip_ids {
+        let effect_ids: Vec<String> = ctx
+            .db
+            .clip_effect()
+            .clip_id()
+            .filter(&clip_id)
+            .filter(|effect| effect.project_id == project_id)
+            .map(|effect| effect.id.clone())
+            .collect();
+        for effect_id in effect_ids {
+            ctx.db.clip_effect().id().delete(effect_id);
+        }
+        ctx.db.clip().id().delete(clip_id);
+    }
+}
+
+fn delete_asset_chunks(ctx: &ReducerContext, project_id: &str, asset_id: &str) {
     let ids: Vec<String> = ctx
         .db
         .asset_chunk()
         .asset_id()
         .filter(&asset_id.to_string())
+        .filter(|row| row.project_id == project_id)
         .map(|row| row.id.clone())
         .collect();
     for id in ids {
