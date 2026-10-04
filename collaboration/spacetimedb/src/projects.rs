@@ -10,9 +10,9 @@ use crate::edit::{
 };
 use crate::schema::{
     ActorKind, Collaborator, EditOp, LiveSession, MemberRole, Project, ProjectMetadata, Scene,
-    ShareInvite,
-    TrackGroup, TrackKind, collaborator, live_session, presence as presence_table, project,
-    project_metadata, scene, share_invite, user,
+    ShareInvite, TrackGroup, TrackKind, asset, asset_chunk, clip, clip_effect, collaborator,
+    edit_history, live_session, presence as presence_table, project, project_member,
+    project_metadata, scene, share_invite, track, user,
 };
 use crate::tracks::insert_track;
 
@@ -607,8 +607,8 @@ pub fn refresh_participants(ctx: &ReducerContext, project_id: String) -> Result<
 
 /// Switches one window between editing and view-only.
 ///
-/// The owner, and anyone whose own window can edit, may change it. Promoting
-/// someone fails once four people already hold an edit seat.
+/// Only the host may change it. Promoting someone fails once four people
+/// already hold an edit seat.
 #[spacetimedb::reducer]
 pub fn set_participant_access(
     ctx: &ReducerContext,
@@ -679,13 +679,7 @@ fn ensure_can_manage_participants(ctx: &ReducerContext, project: &Project) -> Re
     if project.owner == ctx.sender() {
         return Ok(());
     }
-    let Some(connection_id) = ctx.connection_id() else {
-        return Err("only an editor can change access".to_string());
-    };
-    match ctx.db.collaborator().connection_id().find(connection_id) {
-        Some(row) if row.project_id == project.id && row.can_write => Ok(()),
-        _ => Err("only an editor can change access".to_string()),
-    }
+    Err("only the host can change access".to_string())
 }
 
 fn parse_connection_id(hex: &str) -> Result<ConnectionId, String> {
@@ -736,6 +730,146 @@ fn validate_invite_token(token: &str) -> Result<(), String> {
         return Err("share token has unused characters".to_string());
     }
     Ok(())
+}
+
+/// Deletes one project and every row stored for it, including shared media bytes.
+///
+/// Only the host can do this. A guest removing the project from their own
+/// browser does not wipe the shared session.
+#[spacetimedb::reducer]
+pub fn delete_project(ctx: &ReducerContext, project_id: String) -> Result<(), String> {
+    require_host(ctx, &project_id)?;
+    delete_project_rows(ctx, &project_id);
+    Ok(())
+}
+
+fn delete_project_rows(ctx: &ReducerContext, project_id: &str) {
+    let project_id = project_id.to_string();
+
+    let chunk_ids: Vec<String> = ctx
+        .db
+        .asset_chunk()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id.clone())
+        .collect();
+    for id in chunk_ids {
+        ctx.db.asset_chunk().id().delete(id);
+    }
+
+    let asset_ids: Vec<String> = ctx
+        .db
+        .asset()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id.clone())
+        .collect();
+    for id in asset_ids {
+        ctx.db.asset().id().delete(id);
+    }
+
+    let effect_ids: Vec<String> = ctx
+        .db
+        .clip_effect()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id.clone())
+        .collect();
+    for id in effect_ids {
+        ctx.db.clip_effect().id().delete(id);
+    }
+
+    let clip_ids: Vec<String> = ctx
+        .db
+        .clip()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id.clone())
+        .collect();
+    for id in clip_ids {
+        ctx.db.clip().id().delete(id);
+    }
+
+    let track_ids: Vec<String> = ctx
+        .db
+        .track()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id.clone())
+        .collect();
+    for id in track_ids {
+        ctx.db.track().id().delete(id);
+    }
+
+    let scene_ids: Vec<String> = ctx
+        .db
+        .scene()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id.clone())
+        .collect();
+    for id in scene_ids {
+        ctx.db.scene().id().delete(id);
+    }
+
+    let presence_ids: Vec<ConnectionId> = ctx
+        .db
+        .presence()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.connection_id)
+        .collect();
+    for id in presence_ids {
+        ctx.db.presence().connection_id().delete(id);
+    }
+
+    let collaborator_ids: Vec<ConnectionId> = ctx
+        .db
+        .collaborator()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.connection_id)
+        .collect();
+    for id in collaborator_ids {
+        ctx.db.collaborator().connection_id().delete(id);
+    }
+
+    let invite_tokens: Vec<String> = ctx
+        .db
+        .share_invite()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.token.clone())
+        .collect();
+    for token in invite_tokens {
+        ctx.db.share_invite().token().delete(token);
+    }
+
+    let member_ids: Vec<u64> = ctx
+        .db
+        .project_member()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id)
+        .collect();
+    for id in member_ids {
+        ctx.db.project_member().id().delete(id);
+    }
+
+    let history_ids: Vec<u64> = ctx
+        .db
+        .edit_history()
+        .project_id()
+        .filter(&project_id)
+        .map(|row| row.id)
+        .collect();
+    for id in history_ids {
+        ctx.db.edit_history().id().delete(id);
+    }
+
+    ctx.db.live_session().project_id().delete(project_id.clone());
+    ctx.db.project_metadata().project_id().delete(project_id.clone());
+    ctx.db.project().id().delete(project_id);
 }
 
 #[spacetimedb::reducer]

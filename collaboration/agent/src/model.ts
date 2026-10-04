@@ -1,16 +1,28 @@
 /**
- * OpenAI Responses API loop over {@link CollabAgent}.
+ * Gemini loop over {@link CollabAgent}.
  *
  * The model only sees clip ids, seconds, and tool names. Every mutation still
  * goes through `agent.call`, which maps to one reducer. There is no path for
  * the model to write the database itself.
+ *
+ * Default model is Gemini 3.5 Flash-Lite. It is free on the Developer API
+ * free tier and is the high-volume model, so a testing session of many short
+ * prompts fits before the daily quota resets. Override with GEMINI_MODEL.
  */
+
+import {
+	ApiError,
+	FunctionCallingConfigMode,
+	GoogleGenAI,
+	ThinkingLevel,
+	type Content,
+	type FunctionDeclaration,
+} from "@google/genai";
 
 import type { CollabAgent, ToolResult } from "./agent";
 import { TOOLS } from "./tools";
 
-/** The current flagship model; override with OPENAI_MODEL when needed. */
-export const DEFAULT_MODEL = "gpt-6-astra";
+export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 export type AgentMode = "chat" | "goal";
 
@@ -35,18 +47,6 @@ export interface RunOutcome {
 	events: AgentEvent[];
 }
 
-interface ResponseFunctionCall extends Record<string, unknown> {
-	type: "function_call";
-	call_id: string;
-	name: string;
-	arguments: string;
-}
-
-interface OpenAIResponse {
-	output: Array<Record<string, unknown>>;
-	output_text?: string;
-}
-
 const SYSTEM = `You are a collaborator on a shared video-editing project.
 
 You edit through tools only. Each tool is one timeline operation (move, trim,
@@ -64,106 +64,92 @@ Rules:
 export async function runAgent(options: RunOptions): Promise<RunOutcome> {
 	const mode = options.mode ?? "chat";
 	const maxSteps = options.maxSteps ?? (mode === "goal" ? 12 : 6);
-	const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
-	const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+	const model = options.model ?? process.env.GEMINI_MODEL ?? DEFAULT_MODEL;
+	const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
 	if (!apiKey) {
-		throw new Error("OPENAI_API_KEY is not set");
+		throw new Error("GEMINI_API_KEY is not set");
 	}
 
+	const ai = new GoogleGenAI({ apiKey });
 	const events: AgentEvent[] = [];
 	const emit = (event: AgentEvent) => {
 		events.push(event);
 		options.onEvent?.(event);
 	};
-	const input: Array<Record<string, unknown>> = [
+
+	const contents: Content[] = [
 		{
 			role: "user",
-			content: composeUserTurn({
-				agent: options.agent,
-				prompt: options.prompt,
-				mode,
-			}),
+			parts: [
+				{
+					text: composeUserTurn({
+						agent: options.agent,
+						prompt: options.prompt,
+						mode,
+					}),
+				},
+			],
 		},
 	];
 
 	for (let step = 0; step < maxSteps; step += 1) {
-		const response = await createResponse({ apiKey, model, mode, input });
-		const calls = response.output.filter(isFunctionCall);
+		const response = await generateContent(ai, {
+			model,
+			contents,
+			config: {
+				systemInstruction: SYSTEM,
+				tools: [{ functionDeclarations: toDeclarations() }],
+				toolConfig: {
+					functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO },
+				},
+				thinkingConfig: {
+					// Low thinking keeps each prompt inside the free daily token budget.
+					thinkingLevel: ThinkingLevel.LOW,
+				},
+			},
+		});
+
+		const modelContent = response.candidates?.[0]?.content;
+		if (modelContent) {
+			contents.push(modelContent);
+		}
+
+		const calls = response.functionCalls ?? [];
 		if (calls.length === 0) {
-			const reply = response.output_text?.trim() || "Done.";
+			const reply = response.text?.trim() || "Done.";
 			emit({ type: "reply", text: reply });
 			return { reply, events };
 		}
 
-		// Responses may contain reasoning and function-call items. Returning the
-		// complete output preserves the model's context for the next round.
-		input.push(...response.output);
+		const results: ToolResult[] = [];
 		for (const call of calls) {
-			const args = parseToolArguments(call.arguments);
-			emit({ type: "tool", name: call.name, args });
-			const result = await options.agent.call({ name: call.name, args });
+			const name = call.name ?? "";
+			const args = call.args ?? {};
+			emit({ type: "tool", name, args });
+			const result = await options.agent.call({ name, args });
 			emit({ type: "result", result });
-
-			input.push({
-				type: "function_call_output",
-				call_id: call.call_id,
-				output: JSON.stringify({
-					ok: result.ok,
-					detail: result.detail,
-					timeline: options.agent.describe(),
-				}),
-			});
+			results.push(result);
 		}
+
+		contents.push({
+			role: "user",
+			parts: calls.map((call, index) => ({
+				functionResponse: {
+					id: call.id,
+					name: call.name,
+					response: {
+						ok: results[index]?.ok ?? false,
+						detail: results[index]?.detail ?? "no result",
+						timeline: options.agent.describe(),
+					},
+				},
+			})),
+		});
 	}
 
 	const reply = `Stopped after ${maxSteps} steps.`;
 	emit({ type: "reply", text: reply });
 	return { reply, events };
-}
-
-async function createResponse({
-	apiKey,
-	model,
-	mode,
-	input,
-}: {
-	apiKey: string;
-	model: string;
-	mode: AgentMode;
-	input: Array<Record<string, unknown>>;
-}): Promise<OpenAIResponse> {
-	return withRetry(async () => {
-		const response = await fetch("https://api.openai.com/v1/responses", {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				model,
-				instructions: SYSTEM,
-				input,
-				tools: toFunctionTools(),
-				reasoning: { effort: mode === "goal" ? "medium" : "low" },
-				// Timeline state can contain private project details. The server owns
-				// the turn history, so no OpenAI-side response storage is required.
-				store: false,
-			}),
-		});
-
-		if (!response.ok) {
-			throw new OpenAIRequestError({
-				status: response.status,
-				message: await responseMessage(response),
-			});
-		}
-
-		const payload: unknown = await response.json();
-		if (!isOpenAIResponse(payload)) {
-			throw new Error("OpenAI returned an invalid Responses payload");
-		}
-		return payload;
-	});
 }
 
 function composeUserTurn({
@@ -183,70 +169,27 @@ function composeUserTurn({
 	return `${heading}\n\n${prompt}\n\nCurrent timeline:\n${agent.describe()}`;
 }
 
-function toFunctionTools(): Array<Record<string, unknown>> {
+function toDeclarations(): FunctionDeclaration[] {
 	return TOOLS.map((tool) => ({
-		type: "function",
 		name: tool.name,
 		description: tool.description,
-		parameters: tool.parameters,
-		strict: false,
+		parametersJsonSchema: tool.parameters,
 	}));
 }
 
-function isFunctionCall(
-	item: Record<string, unknown>,
-): item is ResponseFunctionCall {
-	return (
-		item.type === "function_call" &&
-		typeof item.call_id === "string" &&
-		typeof item.name === "string" &&
-		typeof item.arguments === "string"
-	);
-}
+const OVERLOAD_ATTEMPTS = 4;
 
-function parseToolArguments(raw: string): Record<string, unknown> {
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		if (
-			typeof parsed === "object" &&
-			parsed !== null &&
-			!Array.isArray(parsed)
-		) {
-			return parsed as Record<string, unknown>;
-		}
-	} catch {
-		// The existing tool validator will turn this into an actionable result.
-	}
-	return {};
-}
-
-function isOpenAIResponse(value: unknown): value is OpenAIResponse {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		Array.isArray((value as OpenAIResponse).output)
-	);
-}
-
-class OpenAIRequestError extends Error {
-	readonly status: number;
-
-	constructor({ status, message }: { status: number; message: string }) {
-		super(`OpenAI request failed (${status}): ${message}`);
-		this.status = status;
-	}
-}
-
-const RETRY_ATTEMPTS = 4;
-
-async function withRetry<T>(request: () => Promise<T>): Promise<T> {
+async function generateContent(
+	ai: GoogleGenAI,
+	request: Parameters<GoogleGenAI["models"]["generateContent"]>[0],
+) {
 	let lastError: unknown;
-	for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt += 1) {
+	for (let attempt = 0; attempt < OVERLOAD_ATTEMPTS; attempt += 1) {
 		try {
-			return await request();
+			return await ai.models.generateContent(request);
 		} catch (error) {
 			lastError = error;
-			if (!isRetryable(error) || attempt === RETRY_ATTEMPTS - 1) {
+			if (!isModelOverloaded(error) || attempt === OVERLOAD_ATTEMPTS - 1) {
 				throw error;
 			}
 			await delay(1000 * 2 ** attempt);
@@ -255,23 +198,12 @@ async function withRetry<T>(request: () => Promise<T>): Promise<T> {
 	throw lastError;
 }
 
-function isRetryable(error: unknown): boolean {
-	return (
-		error instanceof OpenAIRequestError &&
-		(error.status === 408 ||
-			error.status === 409 ||
-			error.status === 429 ||
-			error.status >= 500)
-	);
-}
-
-async function responseMessage(response: Response): Promise<string> {
-	try {
-		const message = (await response.text()).trim();
-		return message || response.statusText;
-	} catch {
-		return response.statusText;
+function isModelOverloaded(error: unknown): boolean {
+	if (error instanceof ApiError && error.status === 503) {
+		return true;
 	}
+	const message = error instanceof Error ? error.message : String(error);
+	return message.includes("UNAVAILABLE") || message.includes("high demand");
 }
 
 function delay(ms: number): Promise<void> {

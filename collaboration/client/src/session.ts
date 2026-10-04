@@ -657,11 +657,15 @@ export class CollabSession {
 	/**
 	 * Switches one window between editing and view-only.
 	 *
-	 * The server refuses a promotion once four people already hold an edit seat.
+	 * Only the host may call this. The server refuses a promotion once four
+	 * people already hold an edit seat.
 	 */
 	async setParticipantAccess(connectionId: string, canWrite: boolean): Promise<void> {
 		if (this.#closed) {
 			throw new Error("session is closed");
+		}
+		if (!this.isHost) {
+			throw new Error("only the host can change access");
 		}
 		await this.#connection.reducers.setParticipantAccess({
 			projectId: this.projectId,
@@ -718,6 +722,29 @@ export class CollabSession {
 	onDeparture(listener: Listener<SessionDeparture>): () => void {
 		this.#departureListeners.add(listener);
 		return () => this.#departureListeners.delete(listener);
+	}
+
+	/**
+	 * Deletes this project from the shared database, including its media bytes.
+	 *
+	 * Connects only long enough to run the reducer. Subscribing would download
+	 * the files that are about to be removed.
+	 */
+	static async deleteSharedProject(options: SessionOptions): Promise<void> {
+		if (!PROJECT_ID_PATTERN.test(options.projectId)) {
+			throw new Error(`unusable project id \`${options.projectId}\``);
+		}
+		const connection = await connect(options);
+		try {
+			if (options.profile) {
+				await connection.reducers.setUserProfile(options.profile);
+			}
+			await connection.reducers.deleteProject({
+				projectId: options.projectId,
+			});
+		} finally {
+			connection.disconnect();
+		}
 	}
 
 	close(): void {

@@ -417,9 +417,16 @@ function ProjectActions() {
 	};
 
 	const handleDeleteConfirm = async () => {
-		await deleteProjects({ editor, ids: selectedProjectIds });
-		clearSelectedProjects();
-		setIsDeleteDialogOpen(false);
+		try {
+			await deleteProjects({ editor, ids: selectedProjectIds });
+			clearSelectedProjects();
+			setIsDeleteDialogOpen(false);
+		} catch (error) {
+			toast.error("Failed to delete project", {
+				description:
+					error instanceof Error ? error.message : "Please try again",
+			});
+		}
 	};
 
 	const actionHandlers: Record<string, () => void> = {
@@ -574,8 +581,15 @@ function ProjectItem({
 	const handleDeleteClick = () => setIsDeleteDialogOpen(true);
 	const handleInfoClick = () => setIsInfoDialogOpen(true);
 	const handleDeleteConfirm = async () => {
-		await deleteProjects({ editor, ids: [project.id] });
-		setIsDeleteDialogOpen(false);
+		try {
+			await deleteProjects({ editor, ids: [project.id] });
+			setIsDeleteDialogOpen(false);
+		} catch (error) {
+			toast.error("Failed to delete project", {
+				description:
+					error instanceof Error ? error.message : "Please try again",
+			});
+		}
 	};
 
 	const handleCheckboxChange = ({

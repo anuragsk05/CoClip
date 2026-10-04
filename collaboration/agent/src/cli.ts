@@ -1,8 +1,8 @@
 /**
  * Demo entry point: attach the agent to a live project and run one prompt.
  *
- *   OPENAI_API_KEY=... bun src/cli.ts --project <id> "cut the first 3 seconds off clip 2"
- *   OPENAI_API_KEY=... bun src/cli.ts --project <id> --goal "tighten the pacing"
+ *   GEMINI_API_KEY=... bun src/cli.ts --project <id> "cut the first 3 seconds off clip 2"
+ *   GEMINI_API_KEY=... bun src/cli.ts --project <id> --goal "tighten the pacing"
  */
 
 import { CollabAgent } from "./agent";

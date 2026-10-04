@@ -526,6 +526,10 @@ test("an editor can switch a window between edit and view", async () => {
 		(collaborator) => collaborator.name === "Guest",
 	);
 
+	await expect(guest.setParticipantAccess(owner.connectionId, false)).rejects.toThrow(
+		/only the host/,
+	);
+
 	await owner.setParticipantAccess(guest.connectionId, false);
 	await waitForAccess(guest, false);
 	expect(guest.canWrite).toBe(false);

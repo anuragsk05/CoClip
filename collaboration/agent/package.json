@@ -12,6 +12,7 @@
     "chat": "bun src/cli.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.27.0",
     "@opencut/collab-client": "workspace:*",
     "spacetimedb": "^2.10.2"
   },

@@ -133,7 +133,8 @@ function ProjectDropdown() {
 							alt="CoClip"
 							width={1254}
 							height={657}
-							className="h-8 w-auto rounded-md"
+							className="block h-7 w-auto shrink-0 object-contain"
+							style={{ width: "auto", height: "1.75rem" }}
 						/>
 					</Button>
 				</DropdownMenuTrigger>

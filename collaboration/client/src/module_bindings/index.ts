@@ -43,6 +43,7 @@ import CreateProjectReducer from "./create_project_reducer";
 import CreateShareInviteReducer from "./create_share_invite_reducer";
 import DeclareAgentReducer from "./declare_agent_reducer";
 import DeleteClipReducer from "./delete_clip_reducer";
+import DeleteProjectReducer from "./delete_project_reducer";
 import DeleteTrackReducer from "./delete_track_reducer";
 import JoinProjectReducer from "./join_project_reducer";
 import LeaveSessionReducer from "./leave_session_reducer";
@@ -325,6 +326,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_share_invite", CreateShareInviteReducer),
   __reducerSchema("declare_agent", DeclareAgentReducer),
   __reducerSchema("delete_clip", DeleteClipReducer),
+  __reducerSchema("delete_project", DeleteProjectReducer),
   __reducerSchema("delete_track", DeleteTrackReducer),
   __reducerSchema("join_project", JoinProjectReducer),
   __reducerSchema("leave_session", LeaveSessionReducer),

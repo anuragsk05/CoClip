@@ -8,6 +8,7 @@ import type {
 	TTimelineViewState,
 } from "@/project/types";
 import type { ExportOptions, ExportResult, ExportState } from "@/export";
+import { deleteSharedProject } from "@/collaboration/delete-shared-project";
 import { storageService } from "@/services/storage/service";
 import { toast } from "sonner";
 import { generateUUID } from "@/utils/id";
@@ -309,6 +310,9 @@ export class ProjectManager {
 		if (uniqueIds.length === 0) return;
 
 		try {
+			for (const id of uniqueIds) {
+				await deleteSharedProject(id);
+			}
 			await Promise.all(
 				uniqueIds.map((id) =>
 					Promise.all([
@@ -335,6 +339,7 @@ export class ProjectManager {
 			this.notify();
 		} catch (error) {
 			console.error("Failed to delete projects:", error);
+			throw error;
 		}
 	}
 

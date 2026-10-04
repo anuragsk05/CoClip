@@ -34,7 +34,7 @@ const MAX_VISIBLE = 4;
 const MAX_EDITORS = 4;
 
 export function Collaborators({ className }: { className?: string }) {
-	const { collaborators, status, session, canWrite, isHost, sessionLive, departure } =
+	const { collaborators, status, session, isHost, sessionLive, departure } =
 		useCollaborationState();
 	const [open, setOpen] = useState(false);
 	const [leaving, setLeaving] = useState(false);
@@ -53,7 +53,7 @@ export function Collaborators({ className }: { className?: string }) {
 		return a.name.localeCompare(b.name);
 	});
 	const editorCount = session?.editorCount() ?? 0;
-	const canManage = session?.role === "owner" || canWrite;
+	const canManage = isHost;
 
 	return (
 		<Popover

@@ -9,10 +9,10 @@ export const maxDuration = 60;
 const PROJECT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export async function POST(request: Request) {
-	const apiKey = process.env.OPENAI_API_KEY;
+	const apiKey = process.env.GEMINI_API_KEY;
 	if (!apiKey) {
 		return NextResponse.json(
-			{ error: "OPENAI_API_KEY is not set on the server" },
+			{ error: "GEMINI_API_KEY is not set on the server" },
 			{ status: 503 },
 		);
 	}
