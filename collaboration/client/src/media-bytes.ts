@@ -12,7 +12,9 @@ export interface MediaChunk {
  *
  * Returns null until every index from 0 to count - 1 is present.
  */
-export function assembleMediaChunks(chunks: MediaChunk[]): Uint8Array | null {
+export function assembleMediaChunks(
+	chunks: MediaChunk[],
+): Uint8Array<ArrayBuffer> | null {
 	const count = chunks[0]?.count ?? 0;
 	if (count === 0) {
 		return null;

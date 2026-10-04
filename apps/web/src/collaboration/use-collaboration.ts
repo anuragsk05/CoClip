@@ -128,26 +128,27 @@ export function useCollaboration({
 				setDeparture(session.departure);
 				setStatus("connected");
 
-				session.onCollaborators((next) => {
+				const live = session;
+				live.onCollaborators((next) => {
 					setCollaborators(next);
-					setCanWrite(session.canWrite);
-					setAtCapacity(session.atCapacity);
-					setIsHost(session.isHost);
+					setCanWrite(live.canWrite);
+					setAtCapacity(live.atCapacity);
+					setIsHost(live.isHost);
 				});
-				session.onWriteAccess((next) => {
+				live.onWriteAccess((next) => {
 					setCanWrite(next);
-					setAtCapacity(session.atCapacity);
+					setAtCapacity(live.atCapacity);
 				});
-				session.onLiveSession((live) => {
-					setSessionLive(live);
-					setCanWrite(session.canWrite);
-					setDeparture(session.departure);
+				live.onLiveSession((active) => {
+					setSessionLive(active);
+					setCanWrite(live.canWrite);
+					setDeparture(live.departure);
 				});
-				session.onDeparture((reason) => {
+				live.onDeparture((reason) => {
 					setDeparture(reason);
-					setCanWrite(session.canWrite);
+					setCanWrite(live.canWrite);
 				});
-				session.onEdit((edit) => {
+				live.onEdit((edit) => {
 					setRecentEdits((edits) =>
 						[edit, ...edits].slice(0, MAX_RECENT_EDITS),
 					);

@@ -121,7 +121,7 @@ async function saveReceivedFile({
 	assetId: string;
 	name: string;
 	mimeType: string;
-	bytes: Uint8Array;
+	bytes: Uint8Array<ArrayBuffer>;
 }): Promise<void> {
 	const file = new File([bytes], name, {
 		type: mimeType || "application/octet-stream",
