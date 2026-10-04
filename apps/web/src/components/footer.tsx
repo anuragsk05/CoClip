@@ -42,15 +42,13 @@ export function Footer() {
 					{/* Brand Section */}
 					<div className="max-w-sm md:col-span-1">
 						<div className="mb-4 flex items-center justify-start gap-2.5">
-							<div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary overflow-hidden">
-								<Image
-									src={DEFAULT_LOGO_URL}
-									alt="CoClip"
-									width={20}
-									height={20}
-									className="size-4.5"
-								/>
-							</div>
+							<Image
+								src={DEFAULT_LOGO_URL}
+								alt="CoClip"
+								width={28}
+								height={28}
+								className="size-7 rounded-lg"
+							/>
 							<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground to-primary bg-clip-text text-transparent">
 								CoClip
 							</span>

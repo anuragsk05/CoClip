@@ -59,15 +59,13 @@ export function Header() {
 					<ContextMenu>
 						<ContextMenuTrigger asChild>
 							<Link href="/" className="flex items-center gap-2.5 group">
-								<div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary transition-transform group-hover:scale-105 overflow-hidden">
-									<Image
-										src={DEFAULT_LOGO_URL}
-										alt="CoClip Logo"
-										className="size-5"
-										width={24}
-										height={24}
-									/>
-								</div>
+								<Image
+									src={DEFAULT_LOGO_URL}
+									alt="CoClip"
+									className="size-8 rounded-lg transition-transform group-hover:scale-105"
+									width={32}
+									height={32}
+								/>
 								<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
 									CoClip
 								</span>
@@ -77,23 +75,25 @@ export function Header() {
 							<ContextMenuItem
 								onClick={async () => {
 									const res = await fetch(DEFAULT_LOGO_URL);
-									const svg = await res.text();
-									await navigator.clipboard.writeText(svg);
+									const blob = await res.blob();
+									await navigator.clipboard.write([
+										new ClipboardItem({ [blob.type]: blob }),
+									]);
 								}}
 							>
 								<HugeiconsIcon icon={Copy01Icon} />
-								Copy SVG
+								Copy logo
 							</ContextMenuItem>
 							<ContextMenuItem
 								onClick={() => {
 									const a = document.createElement("a");
 									a.href = DEFAULT_LOGO_URL;
-									a.download = "coclip-logo.svg";
+									a.download = "coclip-mark.png";
 									a.click();
 								}}
 							>
 								<HugeiconsIcon icon={Download01Icon} />
-								Download SVG
+								Download logo
 							</ContextMenuItem>
 							<Link href="/brand">
 								<ContextMenuItem>

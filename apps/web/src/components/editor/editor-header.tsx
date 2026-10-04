@@ -123,13 +123,13 @@ function ProjectDropdown() {
 		<>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
-					<Button variant="ghost" size="icon" className="p-1 rounded-sm size-8">
+					<Button variant="ghost" size="icon" className="p-0 rounded-lg size-8">
 						<Image
 							src={DEFAULT_LOGO_URL}
 							alt="CoClip"
 							width={32}
 							height={32}
-							className="size-5 rounded-sm"
+							className="size-8 rounded-lg"
 						/>
 					</Button>
 				</DropdownMenuTrigger>
