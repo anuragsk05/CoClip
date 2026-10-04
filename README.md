@@ -64,7 +64,7 @@ CoClip/
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/your-username/CoClip.git
+   git clone https://github.com/anuragsk05/CoClip.git
    cd CoClip
    ```
 
@@ -173,7 +173,7 @@ The production web build will be available at [http://localhost:3100](http://loc
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to open issues or submit pull requests.
+Contributions are welcome! Please feel free to open issues or submit pull requests at [github.com/anuragsk05/CoClip](https://github.com/anuragsk05/CoClip).
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -186,3 +186,7 @@ Contributions are welcome! Please feel free to open issues or submit pull reques
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+![Star History Chart](https://api.star-history.com/svg?repos=anuragsk05/CoClip&type=Date)
