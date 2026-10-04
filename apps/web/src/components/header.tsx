@@ -64,7 +64,7 @@ export function Header() {
 									alt="CoClip"
 									width={1254}
 									height={657}
-									className="h-9 w-auto rounded-md transition-transform group-hover:scale-105"
+									className="h-7 w-auto rounded-md transition-transform group-hover:scale-105"
 								/>
 								<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
 									CoClip
