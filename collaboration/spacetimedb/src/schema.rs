@@ -377,3 +377,17 @@ pub struct EditHistory {
     pub payload: String,
     pub at: Timestamp,
 }
+
+/// Last 200 project messages, retained across live sessions.
+#[spacetimedb::table(accessor = chat_message, public)]
+pub struct ChatMessage {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub project_id: String,
+    pub author: Identity,
+    pub author_name: String,
+    pub text: String,
+    pub sent_at: Timestamp,
+}

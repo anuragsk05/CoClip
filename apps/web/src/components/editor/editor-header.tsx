@@ -26,6 +26,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ShortcutsDialog } from "@/actions/components/shortcuts-dialog";
 import Image from "next/image";
 import { cn } from "@/utils/ui";
+import { SessionChat } from "@/collaboration/components/session-chat";
 import { AgentPanel } from "@/collaboration/components/agent-panel";
 import { Collaborators } from "@/collaboration/components/collaborators";
 import { ShareLink } from "@/collaboration/components/share-link";
@@ -41,6 +42,7 @@ export function EditorHeader() {
 			<nav className="flex items-center gap-2">
 				<CollaboratorsIndicator />
 				<ShareLink />
+				<SessionChat />
 				<AgentPanel />
 				<FeedbackPopover />
 				<ExportButton />

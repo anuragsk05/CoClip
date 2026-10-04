@@ -11,7 +11,7 @@ use crate::edit::{
 use crate::schema::{
     ActorKind, Collaborator, EditOp, LiveSession, MemberRole, Project, ProjectMetadata, Scene,
     ShareInvite, TrackGroup, TrackKind, asset, asset_chunk, clip, clip_effect, collaborator,
-    edit_history, live_session, presence as presence_table, project, project_member,
+    chat_message, edit_history, live_session, presence as presence_table, project, project_member,
     project_metadata, scene, share_invite, track, user,
 };
 use crate::tracks::insert_track;
@@ -745,6 +745,8 @@ pub fn delete_project(ctx: &ReducerContext, project_id: String) -> Result<(), St
 
 fn delete_project_rows(ctx: &ReducerContext, project_id: &str) {
     let project_id = project_id.to_string();
+    let message_ids: Vec<u64> = ctx.db.chat_message().project_id().filter(&project_id).map(|row| row.id).collect();
+    for id in message_ids { ctx.db.chat_message().id().delete(id); }
 
     let chunk_ids: Vec<String> = ctx
         .db

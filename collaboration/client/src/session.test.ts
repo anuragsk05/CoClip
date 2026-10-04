@@ -845,3 +845,79 @@ test("rejects a clip placed on an incompatible track", async () => {
 
 	expect(editor.snapshot().clips).toHaveLength(0);
 });
+
+test("shared chat reaches a viewer, permits viewer replies, and preserves timeline revision", async () => {
+	const projectId = `test-chat-${crypto.randomUUID()}`;
+	const host = await openSession({ projectId, name: "Chat Host" });
+	await host.createProject({
+		name: "Chat",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	await expect(host.sendChatMessage("before session")).rejects.toThrow();
+	await host.startLiveSession();
+	const inviteToken = await host.ensureShareInvite(false);
+	const viewer = await openSession({
+		projectId,
+		name: "Chat Viewer",
+		inviteToken,
+	});
+	const messageCounts: number[] = [];
+	const stopChat = viewer.onChatMessages((messages) => messageCounts.push(messages.length));
+	expect(messageCounts).toEqual([0]);
+	const revision = host.snapshot().revision;
+	await host.sendChatMessage("  Hello team  ");
+	await waitUntil(() => viewer.chatMessages().length === 1);
+	expect(viewer.chatMessages()[0]?.text).toBe("Hello team");
+	expect(viewer.chatMessages()[0]?.author).toBe(host.identity);
+	expect(viewer.chatMessages()[0]?.authorName).toBe("Chat Host");
+	await viewer.sendChatMessage("Hello back");
+	await waitUntil(() => host.chatMessages().length === 2);
+	expect(host.chatMessages()[1]?.authorName).toBe("Chat Viewer");
+	expect(host.snapshot().revision).toBe(revision);
+	expect(messageCounts).toContain(1);
+	stopChat();
+	await expect(viewer.sendChatMessage(" ")).rejects.toThrow();
+	await expect(viewer.sendChatMessage("x".repeat(2001))).rejects.toThrow();
+	await host.removeParticipant(viewer.identity);
+	await expect(viewer.sendChatMessage("removed guest")).rejects.toThrow();
+	await host.stopLiveSession();
+	await expect(host.sendChatMessage("ended session")).rejects.toThrow();
+});
+
+test("chat retains only the last 200 messages, restores history on join, and scopes projects", async () => {
+	const projectId = `test-chat-history-${crypto.randomUUID()}`;
+	const host = await openSession({ projectId, name: "Host" });
+	await host.createProject({
+		name: "Chat",
+		sceneId: `${projectId}-scene`,
+		mainTrackId: `${projectId}-main`,
+		metadata: null,
+	});
+	await host.startLiveSession();
+	for (let i = 0; i < 202; i++) await host.sendChatMessage(`Message ${i}`);
+	await waitUntil(() => host.chatMessages().at(-1)?.text === "Message 201");
+	expect(host.chatMessages()).toHaveLength(200);
+	expect(host.chatMessages()[0]?.text).toBe("Message 2");
+	const guest = await openSession({
+		projectId,
+		name: "Guest",
+		inviteToken: await host.ensureShareInvite(false),
+	});
+	expect(guest.chatMessages()).toHaveLength(200);
+	const stranger = await openSession({
+		projectId: `other-${crypto.randomUUID()}`,
+		name: "Other",
+	});
+	expect(stranger.chatMessages()).toHaveLength(0);
+	await expect(stranger.sendChatMessage("not joined")).rejects.toThrow();
+});
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+	const deadline = Date.now() + 3000;
+	while (!predicate()) {
+		if (Date.now() > deadline) throw new Error("Timed out waiting for chat");
+		await Bun.sleep(10);
+	}
+}

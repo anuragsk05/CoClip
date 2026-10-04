@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { useAgentEditHighlight } from "@/collaboration/agent-edit-highlights-provider";
 import { useEditor } from "@/editor/use-editor";
 import { useAssetsPanelStore } from "@/components/editor/panels/assets/assets-panel-store";
 import { AudioWaveform, WAVEFORM_GAIN_SAMPLE_COUNT } from "./audio-waveform";
@@ -47,7 +48,10 @@ import {
 	getSourceAudioActionLabel,
 	isSourceAudioSeparated,
 } from "@/timeline/audio-separation";
-import { buildWaveformGainSamples, isElementMuted } from "@/timeline/audio-state";
+import {
+	buildWaveformGainSamples,
+	isElementMuted,
+} from "@/timeline/audio-state";
 import { getTimelinePixelsPerSecond } from "@/timeline";
 import { buildWaveformSourceKey } from "@/media/waveform-summary";
 import { addMediaTime, type MediaTime, TICKS_PER_SECOND } from "@/wasm";
@@ -547,6 +551,7 @@ function ElementInner({
 	}) => void;
 	isDropTarget?: boolean;
 }) {
+	const agentEdit = useAgentEditHighlight(element.id);
 	const visibleElement = displayElement ?? element;
 	const isReducedOpacity =
 		(canElementBeHidden(visibleElement) && visibleElement.hidden) ||
@@ -561,6 +566,7 @@ function ElementInner({
 		>
 			<div
 				className="absolute inset-0 rounded-sm"
+				data-agent-edited={agentEdit ? "true" : undefined}
 				style={
 					isSelected
 						? {
@@ -569,6 +575,20 @@ function ElementInner({
 						: undefined
 				}
 			>
+				{agentEdit && (
+					<div
+						className="pointer-events-none absolute inset-0 z-20 rounded-sm border-2 border-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.6)]"
+						role="img"
+						aria-label={`AI edit: ${agentEdit}`}
+					>
+						<span
+							className="absolute right-0 top-0 max-w-full truncate rounded-bl-sm bg-violet-500 px-1 text-[10px] font-medium leading-4 text-white"
+							aria-hidden="true"
+						>
+							AI edited
+						</span>
+					</div>
+				)}
 				<div
 					className={cn(
 						"absolute inset-0 overflow-hidden rounded-sm",
@@ -909,7 +929,9 @@ function TextElementContent({
 	return (
 		<div className="flex size-full items-center justify-start pl-2">
 			<span className="truncate text-xs text-white">
-				{typeof element.params.content === "string" ? element.params.content : ""}
+				{typeof element.params.content === "string"
+					? element.params.content
+					: ""}
 			</span>
 		</div>
 	);

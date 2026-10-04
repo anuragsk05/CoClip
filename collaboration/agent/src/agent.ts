@@ -76,13 +76,13 @@ export class CollabAgent {
 		return this.#session.snapshot();
 	}
 
-	view(): ProjectView {
-		return toProjectView({ snapshot: this.#session.snapshot() });
+	view(sceneId?: string): ProjectView {
+		return toProjectView({ snapshot: this.#session.snapshot(), sceneId });
 	}
 
 	/** The current timeline rendered for a prompt. */
-	describe(): string {
-		return describeProject(this.view());
+	describe(sceneId?: string): string {
+		return describeProject(this.view(sceneId));
 	}
 
 	collaborators(): Collaborator[] {

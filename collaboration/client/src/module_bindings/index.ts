@@ -57,6 +57,7 @@ import RemoveParticipantReducer from "./remove_participant_reducer";
 import RenameProjectReducer from "./rename_project_reducer";
 import ReorderEffectReducer from "./reorder_effect_reducer";
 import ReorderTrackReducer from "./reorder_track_reducer";
+import SendChatMessageReducer from "./send_chat_message_reducer";
 import SetClipHiddenReducer from "./set_clip_hidden_reducer";
 import SetClipMutedReducer from "./set_clip_muted_reducer";
 import SetParticipantAccessReducer from "./set_participant_access_reducer";
@@ -81,6 +82,7 @@ import UpdatePresenceReducer from "./update_presence_reducer";
 // Import all table schema definitions
 import AssetRow from "./asset_table";
 import AssetChunkRow from "./asset_chunk_table";
+import ChatMessageRow from "./chat_message_table";
 import ClipRow from "./clip_table";
 import ClipEffectRow from "./clip_effect_table";
 import CollaboratorRow from "./collaborator_table";
@@ -130,6 +132,20 @@ const tablesSchema = __schema({
       { name: 'asset_chunk_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AssetChunkRow),
+  chatMessage: __table({
+    name: 'chat_message',
+    indexes: [
+      { accessor: 'id', name: 'chat_message_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'project_id', name: 'chat_message_project_id_idx_btree', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_message_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatMessageRow),
   clip: __table({
     name: 'clip',
     indexes: [
@@ -340,6 +356,7 @@ const reducersSchema = __reducers(
   __reducerSchema("rename_project", RenameProjectReducer),
   __reducerSchema("reorder_effect", ReorderEffectReducer),
   __reducerSchema("reorder_track", ReorderTrackReducer),
+  __reducerSchema("send_chat_message", SendChatMessageReducer),
   __reducerSchema("set_clip_hidden", SetClipHiddenReducer),
   __reducerSchema("set_clip_muted", SetClipMutedReducer),
   __reducerSchema("set_participant_access", SetParticipantAccessReducer),
@@ -368,6 +385,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
   tables: typeof tablesSchema.schemaType.tables & {
     /** @deprecated Use `assetChunk` instead. This alias will be removed in the next major version. */
     readonly "asset_chunk": Omit<typeof tablesSchema.schemaType.tables["assetChunk"], "accessorName"> & { readonly accessorName: "asset_chunk" };
+    /** @deprecated Use `chatMessage` instead. This alias will be removed in the next major version. */
+    readonly "chat_message": Omit<typeof tablesSchema.schemaType.tables["chatMessage"], "accessorName"> & { readonly accessorName: "chat_message" };
     /** @deprecated Use `clipEffect` instead. This alias will be removed in the next major version. */
     readonly "clip_effect": Omit<typeof tablesSchema.schemaType.tables["clipEffect"], "accessorName"> & { readonly accessorName: "clip_effect" };
     /** @deprecated Use `editHistory` instead. This alias will be removed in the next major version. */
@@ -399,6 +418,7 @@ const REMOTE_MODULE = {
 
 const tableAccessorAliases = {
   "asset_chunk": "assetChunk",
+  "chat_message": "chatMessage",
   "clip_effect": "clipEffect",
   "edit_history": "editHistory",
   "live_session": "liveSession",
@@ -427,6 +447,8 @@ type __DbViewBase = __DbConnectionImpl<typeof REMOTE_MODULE>["db"];
 export type DbView = __DbViewBase & {
   /** @deprecated Use `assetChunk` instead. This alias will be removed in the next major version. */
   readonly "asset_chunk": __DbViewBase["assetChunk"];
+  /** @deprecated Use `chatMessage` instead. This alias will be removed in the next major version. */
+  readonly "chat_message": __DbViewBase["chatMessage"];
   /** @deprecated Use `clipEffect` instead. This alias will be removed in the next major version. */
   readonly "clip_effect": __DbViewBase["clipEffect"];
   /** @deprecated Use `editHistory` instead. This alias will be removed in the next major version. */
@@ -445,6 +467,8 @@ type __TablesBase = __QueryBuilder<typeof tablesSchema.schemaType>;
 export type Tables = __TablesBase & {
   /** @deprecated Use `assetChunk` instead. This alias will be removed in the next major version. */
   readonly "asset_chunk": __TablesBase["assetChunk"];
+  /** @deprecated Use `chatMessage` instead. This alias will be removed in the next major version. */
+  readonly "chat_message": __TablesBase["chatMessage"];
   /** @deprecated Use `clipEffect` instead. This alias will be removed in the next major version. */
   readonly "clip_effect": __TablesBase["clipEffect"];
   /** @deprecated Use `editHistory` instead. This alias will be removed in the next major version. */
