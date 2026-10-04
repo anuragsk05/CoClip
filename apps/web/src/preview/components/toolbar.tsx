@@ -37,20 +37,6 @@ export function PreviewToolbar({
 			<PlayPauseButton />
 			<div className="justify-self-end flex items-center gap-2.5">
 				<ZoomSelect />
-				<Separator orientation="vertical" className="h-4" />
-				{/* v0.4.0 */}
-				{/* <GridPopover>
-					<Button
-						variant={activeGuideDefinition ? "secondary" : "text"}
-						size="icon"
-					>
-						{activeGuideDefinition ? (
-							activeGuideDefinition.renderTriggerIcon()
-						) : (
-							<HugeiconsIcon icon={GridTableIcon} />
-						)}
-					</Button>
-				</GridPopover> */}
 				<Button variant="text" onClick={onToggleFullscreen}>
 					<HugeiconsIcon icon={FullScreenIcon} />
 				</Button>
@@ -136,8 +122,9 @@ function PlayPauseButton() {
 
 	return (
 		<Button
-			variant="text"
+			variant="primary"
 			size="icon"
+			className="size-8 rounded-full shadow-md shadow-primary/25 hover:scale-105 active:scale-95 transition-all"
 			onClick={() => invokeAction("toggle-play")}
 		>
 			<HugeiconsIcon icon={isPlaying ? PauseIcon : PlayIcon} />

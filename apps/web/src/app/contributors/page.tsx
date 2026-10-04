@@ -7,13 +7,13 @@ import { EXTERNAL_TOOLS } from "@/site/external-tools";
 import { BasePage } from "../base-page";
 
 export const metadata: Metadata = {
-	title: "Contributors - OpenCut",
+	title: "Contributors - CoClip",
 	description:
-		"Meet the amazing people who contribute to OpenCut, the free and open-source video editor.",
+		"Meet the amazing people who contribute to CoClip, the modern open-source video editor.",
 	openGraph: {
-		title: "Contributors - OpenCut",
+		title: "Contributors - CoClip",
 		description:
-			"Meet the amazing people who contribute to OpenCut, the free and open-source video editor.",
+			"Meet the amazing people who contribute to CoClip, the modern open-source video editor.",
 		type: "website",
 	},
 };
@@ -70,7 +70,7 @@ export default async function ContributorsPage() {
 	return (
 		<BasePage
 			title="Contributors"
-			description="Meet the amazing people who contribute to OpenCut, the free and open-source video editor."
+			description="Meet the amazing people who contribute to CoClip, the modern open-source video editor."
 		>
 			<div className="-mt-4 flex items-center justify-center gap-8 text-sm">
 				<StatItem value={contributors.length} label="contributors" />
@@ -87,7 +87,7 @@ export default async function ContributorsPage() {
 				<ExternalToolsSection />
 				<GitHubContributeSection
 					title="Join the community"
-					description="OpenCut is built by developers like you. Every contribution, no matter how small, helps make video editing more accessible for everyone."
+					description="CoClip is built by creators and developers like you. Every contribution helps make video editing faster and more accessible for everyone."
 				/>
 			</div>
 		</BasePage>

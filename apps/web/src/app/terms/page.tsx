@@ -10,13 +10,13 @@ import { Separator } from "@/components/ui/separator";
 import { SOCIAL_LINKS } from "@/site/social";
 
 export const metadata: Metadata = {
-	title: "Terms of Service - OpenCut",
+	title: "Terms of Service - CoClip",
 	description:
-		"OpenCut's Terms of Service. Fair, transparent terms for our free and open-source video editor.",
+		"CoClip's Terms of Service. Fair, transparent terms for our free and modern video editor.",
 	openGraph: {
-		title: "Terms of Service - OpenCut",
+		title: "Terms of Service - CoClip",
 		description:
-			"OpenCut's Terms of Service. Fair, transparent terms for our free and open-source video editor.",
+			"CoClip's Terms of Service. Fair, transparent terms for our free and modern video editor.",
 		type: "website",
 	},
 };
@@ -70,10 +70,10 @@ export default function TermsPage() {
 						<p className="mt-4">
 							Questions? Email us at{" "}
 							<a
-								href="mailto:oss@opencut.app"
+								href="mailto:support@coclip.app"
 								className="text-primary hover:underline"
 							>
-								oss@opencut.app
+								support@coclip.app
 							</a>
 						</p>
 					</AccordionContent>
@@ -193,7 +193,7 @@ export default function TermsPage() {
 
 			<section className="flex flex-col gap-3">
 				<h2 className="text-2xl font-semibold">Stopping Use</h2>
-				<p>You can stop using OpenCut at any time:</p>
+				<p>You can stop using CoClip at any time:</p>
 				<ul className="list-disc space-y-2 pl-6">
 					<li>Clear your browser data to remove local projects</li>
 				</ul>
@@ -214,10 +214,10 @@ export default function TermsPage() {
 					</a>
 					, email us at{" "}
 					<a
-						href="mailto:oss@opencut.app"
+						href="mailto:support@coclip.app"
 						className="text-primary hover:underline"
 					>
-						oss@opencut.app
+						support@coclip.app
 					</a>
 					, or reach out on{" "}
 					<a

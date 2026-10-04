@@ -49,19 +49,24 @@ export function Header() {
 	];
 
 	return (
-		<header className="bg-background shadow-background/85 sticky top-0 z-10 shadow-[0_30px_35px_15px_rgba(0,0,0,1)]">
-			<div className="relative flex w-full items-center justify-between px-6 pt-4">
-				<div className="relative z-10 flex items-center gap-6">
+		<header className="sticky top-0 z-30 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl transition-all">
+			<div className="relative flex w-full items-center justify-between px-6 py-3.5">
+				<div className="relative z-10 flex items-center gap-7">
 					<ContextMenu>
 						<ContextMenuTrigger asChild>
-							<Link href="/" className="flex items-center gap-3">
-								<Image
-									src={DEFAULT_LOGO_URL}
-									alt="OpenCut Logo"
-									className="invert dark:invert-0"
-									width={32}
-									height={32}
-								/>
+							<Link href="/" className="flex items-center gap-2.5 group">
+								<div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary transition-transform group-hover:scale-105">
+									<Image
+										src={DEFAULT_LOGO_URL}
+										alt="CoClip Logo"
+										className="invert dark:invert-0 size-4.5"
+										width={24}
+										height={24}
+									/>
+								</div>
+								<span className="text-lg font-bold tracking-tight bg-linear-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
+									CoClip
+								</span>
 							</Link>
 						</ContextMenuTrigger>
 						<ContextMenuContent>
@@ -79,7 +84,7 @@ export function Header() {
 								onClick={() => {
 									const a = document.createElement("a");
 									a.href = DEFAULT_LOGO_URL;
-									a.download = "opencut-logo.svg";
+									a.download = "coclip-logo.svg";
 									a.click();
 								}}
 							>
@@ -98,7 +103,7 @@ export function Header() {
 					<nav className="hidden items-center gap-4 md:flex">
 						{links.map((link) => (
 							<Link key={link.href} href={link.href}>
-								<Button variant="text" className="p-0 text-sm">
+								<Button variant="text" className="p-0 text-sm text-muted-foreground hover:text-foreground transition-colors">
 									{link.label}
 								</Button>
 							</Link>
@@ -119,14 +124,14 @@ export function Header() {
 					</div>
 					<div className="hidden items-center gap-3 md:flex">
 						<Link href={SOCIAL_LINKS.github}>
-							<Button className="bg-background text-sm" variant="outline">
+							<Button className="bg-background text-sm hover:border-primary/40 transition-colors" variant="outline">
 								<HugeiconsIcon icon={GithubIcon} className="size-4" />
-								40k+
+								GitHub
 							</Button>
 						</Link>
 						<Link href="/projects">
-							<Button className="text-sm">
-								Projects
+							<Button variant="primary" className="text-sm shadow-sm shadow-primary/20">
+								Studio Projects
 								<ArrowRight className="size-4" />
 							</Button>
 						</Link>

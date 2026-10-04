@@ -100,8 +100,8 @@ export default function RoadmapPage() {
 				</div>
 				<GitHubContributeSection
 					title="Want to help?"
-					description="OpenCut is open source and built by the community. Every contribution,
-          no matter how small, helps us build the best free video editor
+					description="CoClip is open source and built for creators. Every contribution,
+          no matter how small, helps us build the best video editor
           possible."
 				/>
 			</div>

@@ -517,12 +517,14 @@ function NewProjectButton() {
 
 	return (
 		<Button
+			variant="primary"
 			size="lg"
-			className="flex px-5 md:px-6"
+			className="flex px-5 md:px-6 shadow-md shadow-primary/25 hover:shadow-primary/35 gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
 			onClick={handleCreateProject}
 		>
-			<span className="text-sm font-medium hidden md:block">New project</span>
-			<span className="text-sm font-medium block md:hidden">New</span>
+			<HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+			<span className="text-sm font-semibold hidden md:block">New project</span>
+			<span className="text-sm font-semibold block md:hidden">New</span>
 		</Button>
 	);
 }
@@ -578,36 +580,36 @@ function ProjectItem({
 	};
 
 	const gridContent = (
-		<Card className="bg-background overflow-hidden border-none p-0">
-			<div className="bg-muted relative aspect-video">
+		<Card className="bg-background overflow-hidden border border-border/60 rounded-xl p-0 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 hover:border-primary/40">
+			<div className="bg-muted/40 relative aspect-video overflow-hidden">
 				<div className="absolute inset-0">
 					{project.thumbnail ? (
 						<Image
 							src={project.thumbnail}
 							alt="Project thumbnail"
 							fill
-							className="object-cover"
+							className="object-cover transition-transform duration-300 group-hover:scale-105"
 						/>
 					) : (
-						<div className="flex size-full items-center justify-center">
-							<OcVideoIcon className="text-muted-foreground size-12 shrink-0" />
+						<div className="flex size-full items-center justify-center bg-accent/20">
+							<OcVideoIcon className="text-muted-foreground/60 size-12 shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:text-primary" />
 						</div>
 					)}
 				</div>
 
 				{durationLabel && (
-					<div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs font-semibold px-2 py-1 rounded-sm">
+					<div className="absolute bottom-2 right-2 bg-black/75 backdrop-blur-xs text-white text-xs font-semibold px-2 py-0.5 rounded-md">
 						{durationLabel}
 					</div>
 				)}
 			</div>
 
-			<CardContent className="flex flex-col gap-2 px-0 pt-4">
-				<h3 className="group-hover:text-foreground/90 line-clamp-2 text-sm leading-snug font-medium">
+			<CardContent className="flex flex-col gap-1.5 px-3.5 py-3 bg-card/60">
+				<h3 className="group-hover:text-primary line-clamp-2 text-sm leading-snug font-semibold transition-colors">
 					{project.name}
 				</h3>
-				<div className="text-muted-foreground flex items-center gap-1.5 text-sm">
-					<HugeiconsIcon icon={Calendar04Icon} className="size-4" />
+				<div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+					<HugeiconsIcon icon={Calendar04Icon} className="size-3.5" />
 					<span>Created {formatDate({ date: project.createdAt })}</span>
 				</div>
 			</CardContent>
@@ -994,23 +996,22 @@ function EmptyState() {
 	}
 
 	return (
-		<div className="flex flex-col items-center justify-center gap-6 py-16 text-center">
-			<div className="flex flex-col items-center gap-2">
-				<div className="bg-muted/30 flex size-16 items-center justify-center rounded-full">
+		<div className="flex flex-col items-center justify-center gap-6 py-20 text-center select-none">
+			<div className="flex flex-col items-center gap-3">
+				<div className="bg-primary/10 border border-primary/20 flex size-20 items-center justify-center rounded-3xl shadow-inner">
 					<HugeiconsIcon
 						icon={Video01Icon}
-						className="text-muted-foreground size-8"
+						className="text-primary size-9"
 					/>
 				</div>
-				<h3 className="text-lg font-medium">No projects yet</h3>
-				<p className="text-muted-foreground max-w-md">
-					Start creating your first project. Import media, edit, and export your
-					videos. All privately.
+				<h3 className="text-xl font-bold tracking-tight text-foreground">Welcome to CoClip Studio</h3>
+				<p className="text-muted-foreground max-w-sm text-sm leading-relaxed">
+					Create your first project to start editing with high-performance multi-track timelines and instant rendering.
 				</p>
 			</div>
-			<Button size="lg" className="gap-2" onClick={handleCreateProject}>
-				<HugeiconsIcon icon={PlusSignIcon} />
-				Create your first project
+			<Button variant="primary" size="lg" className="gap-2 shadow-lg shadow-primary/25 hover:shadow-primary/35 transition-all hover:scale-[1.02]" onClick={handleCreateProject}>
+				<HugeiconsIcon icon={PlusSignIcon} className="size-4.5" />
+				Create New Project
 			</Button>
 		</div>
 	);

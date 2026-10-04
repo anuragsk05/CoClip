@@ -20,7 +20,7 @@ export const TIMELINE_TRACK_THEME: Record<
 } as const;
 
 export const SELECTED_TRACK_ROW_CLASS = "bg-accent/50";
-export const DEFAULT_TIMELINE_BOOKMARK_COLOR = "#009dff";
+export const DEFAULT_TIMELINE_BOOKMARK_COLOR = "#8b5cf6";
 
 export function getTimelineElementClassName({
 	type,

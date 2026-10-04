@@ -21,9 +21,7 @@ export const TAB_KEYS = [
 	"text",
 	"stickers",
 	"effects",
-	"transitions",
 	"captions",
-	"adjustment",
 	"settings",
 ] as const;
 
@@ -56,17 +54,9 @@ export const tabs = {
 		icon: createHugeiconsIcon({ icon: MagicWand05Icon }),
 		label: "Effects",
 	},
-	transitions: {
-		icon: createHugeiconsIcon({ icon: ArrowRightDoubleIcon }),
-		label: "Transitions",
-	},
 	captions: {
 		icon: createHugeiconsIcon({ icon: ClosedCaptionIcon }),
 		label: "Captions",
-	},
-	adjustment: {
-		icon: createHugeiconsIcon({ icon: SlidersHorizontalIcon }),
-		label: "Adjustment",
 	},
 	settings: {
 		icon: createHugeiconsIcon({ icon: Settings01Icon }),

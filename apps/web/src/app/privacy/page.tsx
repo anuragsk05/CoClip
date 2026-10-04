@@ -10,13 +10,13 @@ import { Separator } from "@/components/ui/separator";
 import { SOCIAL_LINKS } from "@/site/social";
 
 export const metadata: Metadata = {
-	title: "Privacy Policy - OpenCut",
+	title: "Privacy Policy - CoClip",
 	description:
-		"Learn how OpenCut handles your data and privacy. Our commitment to protecting your information while you edit videos.",
+		"Learn how CoClip handles your data and privacy. Our commitment to protecting your information while you edit videos.",
 	openGraph: {
-		title: "Privacy Policy - OpenCut",
+		title: "Privacy Policy - CoClip",
 		description:
-			"Learn how OpenCut handles your data and privacy. Our commitment to protecting your information while you edit videos.",
+			"Learn how CoClip handles your data and privacy. Our commitment to protecting your information while you edit videos.",
 		type: "website",
 	},
 };
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
 								too - nothing is uploaded
 							</li>
 							<li>
-								OpenCut does not currently require an account or login
+								CoClip does not currently require an account or login
 							</li>
 							<li>Project data stays on your device, not our servers</li>
 							<li>
@@ -65,10 +65,10 @@ export default function PrivacyPage() {
 						<p className="mt-4">
 							Questions? Email us at{" "}
 							<a
-								href="mailto:oss@opencut.app"
+								href="mailto:support@coclip.app"
 								className="text-primary hover:underline"
 							>
-								oss@opencut.app
+								support@coclip.app
 							</a>
 						</p>
 					</AccordionContent>
@@ -199,10 +199,10 @@ export default function PrivacyPage() {
 					</a>
 					, email us at{" "}
 					<a
-						href="mailto:oss@opencut.app"
+						href="mailto:support@coclip.app"
 						className="text-primary hover:underline"
 					>
-						oss@opencut.app
+						support@coclip.app
 					</a>
 					, or reach out on{" "}
 					<a
