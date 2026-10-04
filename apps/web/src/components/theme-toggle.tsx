@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { useTheme } from "next-themes";
 import { cn } from "@/utils/ui";
@@ -17,15 +18,23 @@ export function ThemeToggle({
 	iconClassName,
 	onToggle,
 }: ThemeToggleProps) {
-	const { theme, setTheme } = useTheme();
+	const { theme, setTheme, resolvedTheme } = useTheme();
+	const [mounted, setMounted] = useState(false);
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
+	const isDark = mounted ? (resolvedTheme || theme) === "dark" : false;
 
 	return (
 		<Button
 			size="icon"
 			variant="ghost"
 			className={cn("size-8", className)}
+			aria-label="Toggle theme"
 			onClick={(e) => {
-				setTheme(theme === "dark" ? "light" : "dark");
+				setTheme(isDark ? "light" : "dark");
 				onToggle?.(e);
 			}}
 		>
@@ -33,7 +42,9 @@ export function ThemeToggle({
 				icon={Sun03Icon}
 				className={cn("!size-[1.1rem]", iconClassName)}
 			/>
-			<span className="sr-only">{theme === "dark" ? "Light" : "Dark"}</span>
+			<span className="sr-only" suppressHydrationWarning>
+				Toggle theme
+			</span>
 		</Button>
 	);
 }
