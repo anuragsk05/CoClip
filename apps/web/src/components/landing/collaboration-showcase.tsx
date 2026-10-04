@@ -41,7 +41,7 @@ const COLLABORATORS: Collaborator[] = [
 	{
 		id: "ai",
 		name: "AI Copilot",
-		role: "Gemini 3.8",
+		role: "OpenAI",
 		color: "border-amber-500 text-amber-400 bg-amber-500/10",
 		avatar: "bg-gradient-to-tr from-amber-500 to-purple-600",
 		status: "Removing silent gaps",
@@ -189,7 +189,7 @@ export function CollaborationShowcase() {
 							{/* AI Agent Overlay Indicator */}
 							<div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-black/70 border border-amber-500/50 px-2.5 py-1 text-xs text-amber-300 backdrop-blur-md">
 								<Sparkles className="size-3" />
-								<span>Gemini AI: Timeline Active</span>
+								<span>OpenAI: Timeline Active</span>
 							</div>
 
 							{/* Video Controls bar */}

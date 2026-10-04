@@ -12,13 +12,12 @@ See [architecture.md](architecture.md) for the diagram.
 | --- | --- |
 | `spacetimedb/` | Rust module: tables + reducers. Geometry comes from `rust/crates/timeline`. |
 | `client/` | Collaboration adapter. The only path into SpacetimeDB. |
-| `agent/` | AI collaborator. Same adapter, same reducers, Gemini 3.8 Flash. |
+| `agent/` | AI collaborator. Same adapter and reducers, powered by OpenAI. |
 
 ## Local setup
 
-You need the [SpacetimeDB CLI](https://spacetimedb.com/install) and a Gemini
-API key from [Google AI Studio](https://aistudio.google.com/apikey). The Flash
-tier is free for a demo.
+You need the [SpacetimeDB CLI](https://spacetimedb.com/install) and an OpenAI
+API key.
 
 ```bash
 # 1. Start a local database
@@ -31,7 +30,7 @@ spacetime publish --project-path ./spacetimedb opencut-collab
 #    apps/web/.env.local
 NEXT_PUBLIC_COLLAB_URI=ws://localhost:3000
 NEXT_PUBLIC_COLLAB_DATABASE=opencut-collab
-GEMINI_API_KEY=your-key
+OPENAI_API_KEY=your-key
 ```
 
 Then `bun run dev:web` from the repo root. Open the same project in two
@@ -47,9 +46,8 @@ bun run generate
 
 ## Agent
 
-The model is **Gemini 3.8 Flash** (`gemini-3.8-flash`), chosen because it is
-free on the Gemini Developer API and supports tool calling. Override with
-`GEMINI_MODEL`.
+The agent uses the OpenAI Responses API with **GPT-6 Astra** (`gpt-6-astra`) by
+default. Override it with `OPENAI_MODEL`.
 
 It has two modes:
 
@@ -63,8 +61,8 @@ From the CLI:
 
 ```bash
 cd collaboration/agent
-GEMINI_API_KEY=... bun src/cli.ts --project <project-id> "mute the B-roll"
-GEMINI_API_KEY=... bun src/cli.ts --project <project-id> --goal "tighten the pacing"
+OPENAI_API_KEY=... bun src/cli.ts --project <project-id> "mute the B-roll"
+OPENAI_API_KEY=... bun src/cli.ts --project <project-id> --goal "tighten the pacing"
 ```
 
 ## Known limits

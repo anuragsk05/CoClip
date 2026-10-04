@@ -34,7 +34,7 @@ const FEATURES: Feature[] = [
 		icon: Sparkles,
 		title: "Autonomous AI Timeline Co-Editor",
 		description:
-			"Summon an intelligent Gemini editor directly into your shared room. Prompt it to remove pauses, suggest split points, add markers, or level stems alongside you.",
+			"Summon an OpenAI-powered editor directly into your shared room. Prompt it to remove pauses, suggest split points, add markers, or level stems alongside you.",
 		tag: "AI Collaborator",
 	},
 	{
