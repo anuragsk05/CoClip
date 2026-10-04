@@ -1,5 +1,5 @@
 export const SOCIAL_LINKS = {
 	x: "https://x.com/coclipapp",
-	github: "https://github.com/coclip/coclip",
+	github: "https://github.com/anuragsk05/CoClip",
 	discord: "https://discord.gg/coclip",
 };

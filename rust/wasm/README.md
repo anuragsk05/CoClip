@@ -1,6 +1,6 @@
 # opencut-wasm
 
-Shared video editor logic compiled to WebAssembly. Used by the [OpenCut](https://github.com/opencut/opencut) web app.
+Shared video editor logic compiled to WebAssembly. Used by the [CoClip](https://github.com/anuragsk05/CoClip) web app.
 
 ## Install
 

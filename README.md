@@ -17,7 +17,7 @@ See [collaboration](collaboration/README.md) for multiplayer setup and
 
 - `apps/web/`: Next.js web application
 - `apps/desktop/`: Native desktop app built with GPUI (in progress)
-- `rust/`: Platform-agnostic core: GPU compositor, effects, masks, and WASM bindings. We're actively migrating business logic here from TypeScript.
+- `rust/`: Platform-agnostic core: GPU compositor, effects, masks, and WASM bindings.
 - `collaboration/`: Rust SpacetimeDB module, TypeScript client adapter, and AI agent.
 - `docs/`: Architecture and subsystem documentation
 
@@ -32,7 +32,12 @@ See [collaboration](collaboration/README.md) for multiplayer setup and
 
 ### Setup
 
-1. Fork and clone the repository
+1. Fork and clone the repository:
+
+   ```bash
+   git clone https://github.com/anuragsk05/CoClip.git
+   cd CoClip
+   ```
 
 2. Copy the environment file:
 

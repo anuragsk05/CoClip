@@ -128,7 +128,11 @@ export function Header() {
 						</Button>
 					</div>
 					<div className="hidden items-center gap-3 md:flex">
-						<Link href={SOCIAL_LINKS.github}>
+						<Link
+							href={SOCIAL_LINKS.github}
+							target="_blank"
+							rel="noopener noreferrer"
+						>
 							<Button className="bg-background text-sm hover:border-primary/40 transition-colors" variant="outline">
 								<HugeiconsIcon icon={GithubIcon} className="size-4" />
 								GitHub
