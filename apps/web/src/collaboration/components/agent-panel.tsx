@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SparklesIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,14 @@ export function AgentPanel() {
 	const [prompt, setPrompt] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [lines, setLines] = useState<ChatLine[]>([]);
+	const conversationRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const conversation = conversationRef.current;
+		if (conversation) {
+			conversation.scrollTop = conversation.scrollHeight;
+		}
+	}, [lines, busy, open]);
 
 	if (status === "disabled" || !canWrite) {
 		return null;
@@ -132,32 +140,34 @@ export function AgentPanel() {
 						</ModeButton>
 					</div>
 				</div>
-				<ScrollArea className="h-56 rounded-md border px-2 py-1.5">
-					{lines.length === 0 && (
-						<p className="text-muted-foreground text-xs">
-							{mode === "goal"
-								? "Give it a goal, like “tighten the pacing”."
-								: "Ask for one edit, like “cut the first 3 seconds off the first clip”."}
-						</p>
-					)}
-					<div className="flex flex-col gap-2">
-						{lines.map((line, index) => (
-							<p
-								key={`${line.role}-${index}`}
-								className={cn(
-									"text-xs leading-relaxed",
-									line.role === "user" && "text-foreground font-medium",
-									line.role === "tool" && "text-muted-foreground",
-									line.role === "agent" && "text-foreground",
-								)}
-							>
-								{line.role === "tool" ? `→ ${line.text}` : line.text}
-							</p>
-						))}
-						{busy && <Spinner className="text-muted-foreground" />}
-					</div>
-				</ScrollArea>
+				{lines.length > 0 && (
+					<ScrollArea
+						ref={conversationRef}
+						role="log"
+						aria-label="Agent conversation"
+						aria-live="polite"
+						className="max-h-56 pr-2"
+					>
+						<div className="flex flex-col gap-2">
+							{lines.map((line, index) => (
+								<p
+									key={`${line.role}-${index}`}
+									className={cn(
+										"whitespace-pre-wrap break-words text-xs leading-relaxed",
+										line.role === "user" && "text-foreground font-medium",
+										line.role === "tool" && "text-muted-foreground",
+										line.role === "agent" && "text-foreground",
+									)}
+								>
+									{line.role === "tool" ? `→ ${line.text}` : line.text}
+								</p>
+							))}
+							{busy && <Spinner className="text-muted-foreground" />}
+						</div>
+					</ScrollArea>
+				)}
 				<Textarea
+					aria-label={mode === "goal" ? "Agent goal" : "Agent prompt"}
 					value={prompt}
 					onChange={(event) => setPrompt(event.target.value)}
 					onKeyDown={(event) => {

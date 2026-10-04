@@ -1,12 +1,14 @@
 # Client adapter
 
-This directory is reserved for the OpenCut ↔ SpacetimeDB adapter.
+`CollabSession` in `src/session.ts` connects to SpacetimeDB, dispatches typed
+commands to reducers, and emits project snapshots, presence, history, access
+changes, and session departures. Humans and the agent use this same interface.
 
-Responsibilities:
+The web bridge at `apps/web/src/collaboration/bridge.ts` intercepts committed
+track writes, flattens/diffs them into commands, and rebuilds remote snapshots.
+An `applyRemote` guard prevents feedback loops; temporary drag previews publish
+on commit. Browser media transfer lives in `shared-media.ts` beside the bridge;
+chunk assembly lives in this package's `src/media-bytes.ts`.
 
-1. Connect/authenticate to SpacetimeDB.
-2. Subscribe to the active project's shared state.
-3. Convert local OpenCut timeline mutations into reducers.
-4. Apply remote state updates back into OpenCut.
-5. Prevent feedback loops when replaying remote changes locally.
-6. Publish ephemeral presence separately from durable edit state.
+`src/module_bindings/` is generated. Run `bun run generate` in this directory
+after server schema changes.

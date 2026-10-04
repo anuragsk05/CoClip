@@ -1,6 +1,6 @@
 # OpenCut collaboration
 
-SpacetimeDB-backed multiplayer for the editor. Media stays in storage; the
+SpacetimeDB-backed multiplayer for the editor. Media is cached locally and shared through database chunks; the
 editor keeps its existing UI; every mutation goes through one adapter into
 one set of reducers. Humans and the AI agent share that surface.
 
@@ -24,7 +24,7 @@ API key from [Google AI Studio](https://aistudio.google.com/apikey).
 spacetime start
 
 # 2. Publish the module (from this folder)
-spacetime publish --project-path ./spacetimedb opencut-collab
+spacetime publish --server http://localhost:3000 --module-path ./spacetimedb opencut-collab
 
 # 3. Point the web app at it
 #    apps/web/.env.local
@@ -33,7 +33,8 @@ NEXT_PUBLIC_COLLAB_DATABASE=opencut-collab
 GEMINI_API_KEY=your-key
 ```
 
-Then `bun run dev:web` from the repo root. Open the same project in two
+From the repository root, run `cd apps/web` and `bun run dev --port 3001`. Open
+http://localhost:3001 (SpacetimeDB uses port 3000). Open the same project in two
 browsers: edits, presence, and the Agent button in the header all share the
 project. Without `NEXT_PUBLIC_COLLAB_URI` the editor is unchanged.
 
@@ -46,10 +47,10 @@ bun run generate
 
 ## Agent
 
-The model is **Gemini 3.5 Flash-Lite** (`gemini-3.5-flash-lite`). It is free
-on the Gemini Developer API free tier and is the high-volume model, so a run
-of short prompts lasts longer than Gemini 3.8 Flash. Override it with
-`GEMINI_MODEL`.
+The configured default model is `gemini-3.5-flash-lite`. Override it with
+`GEMINI_MODEL`. The agent reads textual timeline metadata, including clip ids,
+asset names, and timing; it does not inspect video frames or listen to audio.
+Chat allows up to six model round-trips; Goal allows up to twelve.
 
 It has two modes:
 
@@ -69,10 +70,19 @@ GEMINI_API_KEY=... bun src/cli.ts --project <project-id> --goal "tighten the pac
 
 ## Known limits
 
-- Media bytes are still local. Clips register as `storage: "local"` with
-  `location: asset.id`. Cross-machine playback needs an S3/R2 upload that
-  re-registers the same asset.
+- Video, audio, and image bytes are shared through SpacetimeDB in 256 KiB
+  chunks and saved into browser storage on receiving clients. The browser
+  upload limit is 512 MiB per file. Large uploads add database/subscription load.
 - Clip and track ids are globally unique (the editor already generates UUIDs).
 - `edit_history` is subscribed in full per project.
 - Tables are `public`; project scoping is done by subscription SQL, not
   visibility filters.
+
+## Sessions and UI
+
+Hosts can start/end live sessions, create view/edit invites, remove participants,
+and change access. Reducers enforce write permissions. There is a limit of four
+active human editors. Presence includes cursors, selection, playhead, and playback.
+The agent prompt UI is compact until a request is submitted; replies and tool
+activity then appear in a conversation that grows up to a scrollable maximum.
+See [local UI testing](../docs/agent-ui-development.md).
