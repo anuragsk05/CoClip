@@ -41,6 +41,13 @@ export class CollaborationBridge {
 	#onError: (error: Error) => void;
 	#teardown: Array<() => void> = [];
 	#detached = false;
+	#applyingRemoteMedia = false;
+	#publishedIds = new Set<string>();
+	#mediaSync: {
+		stop: () => void;
+		suppress: (ids: string[]) => void;
+		unsuppress: (ids: string[]) => void;
+	} | null = null;
 
 	private constructor(options: BridgeOptions) {
 		this.#editor = options.editor;
@@ -68,7 +75,7 @@ export class CollaborationBridge {
 		if (session.canWrite) {
 			bridge.#followLocalSettings();
 			bridge.#followLocalMedia();
-			void bridge.#publishAssets();
+			void bridge.#publishAssets([]);
 		}
 
 		return bridge;
@@ -205,12 +212,15 @@ export class CollaborationBridge {
 	}
 
 	#followLocalMedia(): void {
-		let publishedIds = new Set<string>();
+		this.#publishedIds = new Set(
+			this.#editor.media.getAssets().map((asset) => asset.id),
+		);
 
 		this.#teardown.push(
 			this.#editor.media.subscribe(() => {
 				if (
 					this.#detached ||
+					this.#applyingRemoteMedia ||
 					this.#session.isApplyingRemote ||
 					!this.#session.canWrite
 				) {
@@ -218,11 +228,15 @@ export class CollaborationBridge {
 				}
 				const assets = this.#editor.media.getAssets();
 				const ids = new Set(assets.map((asset) => asset.id));
-				if (sameSet(publishedIds, ids)) {
+				if (sameSet(this.#publishedIds, ids)) {
 					return;
 				}
-				publishedIds = ids;
-				void this.#publishAssets();
+				const removedIds = [...this.#publishedIds].filter((id) => !ids.has(id));
+				const addedIds = [...ids].filter((id) => !this.#publishedIds.has(id));
+				this.#publishedIds = ids;
+				this.#mediaSync?.suppress(removedIds);
+				this.#mediaSync?.unsuppress(addedIds);
+				void this.#publishAssets(removedIds);
 			}),
 		);
 	}
@@ -233,19 +247,33 @@ export class CollaborationBridge {
 		if (!projectId) {
 			return;
 		}
-		this.#teardown.push(
-			watchSharedMedia({
-				editor: this.#editor,
-				session: this.#session,
-				projectId,
-			}),
-		);
+		const sync = watchSharedMedia({
+			editor: this.#editor,
+			session: this.#session,
+			projectId,
+			replaceAssets: (assets) => {
+				this.#applyingRemoteMedia = true;
+				this.#publishedIds = new Set(assets.map((asset) => asset.id));
+				this.#editor.media.setAssets({ assets });
+				this.#applyingRemoteMedia = false;
+			},
+		});
+		this.#mediaSync = sync;
+		this.#teardown.push(() => {
+			sync.stop();
+			this.#mediaSync = null;
+		});
 	}
 
 	/**
 	 * Registers each asset, then uploads video and audio bytes into the session.
+	 * Ids the local pool dropped are removed once no clip still uses them.
 	 */
-	async #publishAssets(): Promise<void> {
+	async #publishAssets(removedIds: string[]): Promise<void> {
+		for (const assetId of removedIds) {
+			await this.#removeWhenUnused(assetId);
+		}
+
 		const assets = this.#editor.media.getAssets();
 		for (const asset of assets) {
 			try {
@@ -261,6 +289,25 @@ export class CollaborationBridge {
 			await uploadSharedMedia(this.#session, assets);
 		} catch (error) {
 			this.#onError(asError(error));
+		}
+	}
+
+	async #removeWhenUnused(assetId: string): Promise<void> {
+		for (let attempt = 0; attempt < 12; attempt += 1) {
+			try {
+				await this.#session.dispatch({ kind: "removeAsset", assetId });
+				return;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (message.includes("unknown asset")) {
+					return;
+				}
+				if (!message.includes("still used") || attempt === 11) {
+					this.#onError(asError(error));
+					return;
+				}
+				await new Promise((resolve) => setTimeout(resolve, 250));
+			}
 		}
 	}
 

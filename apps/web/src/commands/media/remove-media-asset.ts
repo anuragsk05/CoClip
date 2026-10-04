@@ -43,6 +43,24 @@ export class RemoveMediaAssetCommand extends Command {
 			return;
 		}
 
+		const elementsToRemove: Array<{ trackId: string; elementId: string }> = [];
+
+		for (const track of [
+			...this.savedTracks.overlay,
+			this.savedTracks.main,
+			...this.savedTracks.audio,
+		]) {
+			for (const element of track.elements) {
+				if (hasMediaId(element) && element.mediaId === this.assetId) {
+					elementsToRemove.push({ trackId: track.id, elementId: element.id });
+				}
+			}
+		}
+
+		if (elementsToRemove.length > 0) {
+			editor.timeline.deleteElements({ elements: elementsToRemove });
+		}
+
 		if (this.removedAsset.url) {
 			URL.revokeObjectURL(this.removedAsset.url);
 		}
@@ -61,24 +79,6 @@ export class RemoveMediaAssetCommand extends Command {
 		editor.media.setAssets({
 			assets: assets.filter((media) => media.id !== this.assetId),
 		});
-
-		const elementsToRemove: Array<{ trackId: string; elementId: string }> = [];
-
-		for (const track of [
-			...this.savedTracks.overlay,
-			this.savedTracks.main,
-			...this.savedTracks.audio,
-		]) {
-			for (const element of track.elements) {
-				if (hasMediaId(element) && element.mediaId === this.assetId) {
-					elementsToRemove.push({ trackId: track.id, elementId: element.id });
-				}
-			}
-		}
-
-		if (elementsToRemove.length > 0) {
-			editor.timeline.deleteElements({ elements: elementsToRemove });
-		}
 
 		storageService
 			.deleteMediaAsset({ projectId: this.projectId, id: this.assetId })
