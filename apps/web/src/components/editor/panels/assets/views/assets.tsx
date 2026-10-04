@@ -444,10 +444,19 @@ function MediaPreview({
 	const shouldShowDurationBadge = variant === "grid";
 
 	if (item.type === "image") {
+		if (!item.url) {
+			return (
+				<MediaTypePlaceholder
+					icon={Image02Icon}
+					label="Image"
+					variant="muted"
+				/>
+			);
+		}
 		return (
 			<div className="relative flex size-full items-center justify-center bg-muted">
 				<Image
-					src={item.url ?? ""}
+					src={item.url}
 					alt={item.name}
 					fill
 					sizes="100vw"

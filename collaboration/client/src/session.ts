@@ -818,7 +818,9 @@ export class CollabSession {
 
 		db.clip.onInsert((_ctx, row) => onClipChange(row));
 		db.clip.onUpdate((_ctx, _old, row) => onClipChange(row));
-		db.clip.onDelete((_ctx, row) => onClipChange(row));
+		// A deleted row still carries the last editor's origin, not the person
+		// who removed it. That editor has to hear about the delete too.
+		db.clip.onDelete(() => this.#queueEmit(true));
 
 		// Tracks, scenes, effects, and assets carry no origin, so a change to them
 		// is treated as remote. The guard in `dispatch` is what actually prevents

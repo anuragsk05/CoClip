@@ -1,10 +1,10 @@
 /**
  * The media pool, separate from timeline edits.
  *
- * One editor uploads a video or audio file once. Everyone else saves that file
- * locally when the bytes are complete, then plays that copy. A delete removes
- * it from the pool. Chunk traffic and ordinary edits do not import the file
- * again.
+ * Registering a video, audio file, or image updates every pool immediately.
+ * The bytes follow in the background, and playback uses the local copy once
+ * they are complete. A delete removes the entry. Chunk traffic does not
+ * import the file again.
  */
 
 import { toast } from "sonner";
@@ -12,26 +12,33 @@ import { toast } from "sonner";
 import {
 	assembleMediaChunks,
 	MEDIA_CHUNK_BYTES,
+	secondsFromTicks,
+	type CollabAsset,
 	type CollabSession,
 } from "@opencut/collab-client";
 
 import type { EditorCore } from "@/core";
 import { getMediaTypeFromFile, playableMimeType } from "@/media/media-utils";
 import { processMediaAssets } from "@/media/processing";
-import type { MediaAsset } from "@/media/types";
+import type { MediaAsset, MediaType } from "@/media/types";
 import { storageService } from "@/services/storage/service";
 import { videoCache } from "@/services/video-cache/service";
 import { waveformCache } from "@/services/waveform-cache/service";
 import { buildWaveformSourceKey } from "@/media/waveform-summary";
 
 const MAX_SHARED_BYTES = 512 * 1024 * 1024;
+const UPLOAD_CONCURRENCY = 4;
+
+export function sharesMediaBytes(type: MediaType): boolean {
+	return type === "video" || type === "audio" || type === "image";
+}
 
 export async function uploadSharedMedia(
 	session: CollabSession,
 	assets: MediaAsset[],
 ): Promise<void> {
 	for (const asset of assets) {
-		if (asset.type !== "video" && asset.type !== "audio") {
+		if (!sharesMediaBytes(asset.type)) {
 			continue;
 		}
 		if (asset.file.size === 0 || asset.file.size > MAX_SHARED_BYTES) {
@@ -45,6 +52,7 @@ export async function uploadSharedMedia(
 		}
 
 		const count = Math.ceil(asset.file.size / MEDIA_CHUNK_BYTES);
+		const pending: Array<() => Promise<void>> = [];
 		for (let index = 0; index < count; index += 1) {
 			const start = index * MEDIA_CHUNK_BYTES;
 			const end = Math.min(asset.file.size, start + MEDIA_CHUNK_BYTES);
@@ -54,14 +62,19 @@ export async function uploadSharedMedia(
 			if (already && already.bytes.byteLength === end - start) {
 				continue;
 			}
-			const bytes = new Uint8Array(await asset.file.slice(start, end).arrayBuffer());
-			await session.putAssetChunk({
-				assetId: asset.id,
-				chunkIndex: index,
-				chunkCount: count,
-				bytes,
+			pending.push(async () => {
+				const bytes = new Uint8Array(
+					await asset.file.slice(start, end).arrayBuffer(),
+				);
+				await session.putAssetChunk({
+					assetId: asset.id,
+					chunkIndex: index,
+					chunkCount: count,
+					bytes,
+				});
 			});
 		}
+		await runPool({ jobs: pending, concurrency: UPLOAD_CONCURRENCY });
 	}
 }
 
@@ -91,18 +104,31 @@ export function watchSharedMedia({
 
 	const receive = () => {
 		const remoteIds = new Set<string>();
+		const additions: MediaAsset[] = [];
 
 		for (const asset of session.snapshot().assets) {
 			if (asset.storage !== "spacetime") {
 				continue;
 			}
 			remoteIds.add(asset.id);
-			if (saving.has(asset.id) || suppressed.has(asset.id) || failed.has(asset.id)) {
+			if (saving.has(asset.id) || suppressed.has(asset.id)) {
 				continue;
 			}
 			const local = editor.media.getAssets().find((item) => item.id === asset.id);
 			if (hasPlayableCopy(local, asset.byteSize)) {
 				fromServer.add(asset.id);
+				continue;
+			}
+			if (!local) {
+				const pending = pendingAsset(asset);
+				if (pending) {
+					additions.push(pending);
+					fromServer.add(asset.id);
+				}
+			} else {
+				fromServer.add(asset.id);
+			}
+			if (failed.has(asset.id)) {
 				continue;
 			}
 			const bytes = assembleMediaChunks(session.assetChunks(asset.id));
@@ -142,7 +168,7 @@ export function watchSharedMedia({
 		const stale = current.filter(
 			(item) => fromServer.has(item.id) && !remoteIds.has(item.id),
 		);
-		if (stale.length === 0) {
+		if (additions.length === 0 && stale.length === 0) {
 			return;
 		}
 		const staleIds = new Set(stale.map((item) => item.id));
@@ -151,7 +177,10 @@ export function watchSharedMedia({
 			releaseAsset(item);
 			void storageService.deleteMediaAsset({ projectId, id: item.id });
 		}
-		replaceAssets(current.filter((item) => !staleIds.has(item.id)));
+		replaceAssets([
+			...current.filter((item) => !staleIds.has(item.id)),
+			...additions,
+		]);
 	};
 
 	const schedule = (resetFailures = false) => {
@@ -244,6 +273,63 @@ function releaseAsset(asset: MediaAsset): void {
 	waveformCache.clearSource({
 		sourceKey: buildWaveformSourceKey({ kind: "media", id: asset.id }),
 	});
+}
+
+function pendingAsset(asset: CollabAsset): MediaAsset | null {
+	const mimeType = playableMimeType({
+		name: asset.name,
+		mimeType: asset.mimeType,
+	});
+	const type = mediaTypeFromMime(mimeType);
+	if (!type) {
+		return null;
+	}
+	return {
+		id: asset.id,
+		name: asset.name,
+		type,
+		file: new File([], asset.name, { type: mimeType }),
+		width: asset.width ?? undefined,
+		height: asset.height ?? undefined,
+		duration:
+			asset.duration == null ? undefined : secondsFromTicks(asset.duration),
+	};
+}
+
+function mediaTypeFromMime(mimeType: string): MediaType | null {
+	if (mimeType.startsWith("image/")) {
+		return "image";
+	}
+	if (mimeType.startsWith("video/")) {
+		return "video";
+	}
+	if (mimeType.startsWith("audio/")) {
+		return "audio";
+	}
+	return null;
+}
+
+async function runPool({
+	jobs,
+	concurrency,
+}: {
+	jobs: Array<() => Promise<void>>;
+	concurrency: number;
+}): Promise<void> {
+	let next = 0;
+	const workers = Array.from(
+		{ length: Math.min(concurrency, jobs.length) },
+		async () => {
+			while (next < jobs.length) {
+				const job = jobs[next];
+				next += 1;
+				if (job) {
+					await job();
+				}
+			}
+		},
+	);
+	await Promise.all(workers);
 }
 
 function hasPlayableCopy(

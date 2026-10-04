@@ -27,7 +27,11 @@ import { mediaTimeFromSeconds } from "@/wasm";
 import { diffProjects } from "./diff";
 import { flattenScene } from "./flatten";
 import { rebuildScene } from "./rebuild";
-import { uploadSharedMedia, watchSharedMedia } from "./shared-media";
+import {
+	sharesMediaBytes,
+	uploadSharedMedia,
+	watchSharedMedia,
+} from "./shared-media";
 
 export interface BridgeOptions {
 	editor: EditorCore;
@@ -43,6 +47,7 @@ export class CollaborationBridge {
 	#detached = false;
 	#applyingRemoteMedia = false;
 	#publishedIds = new Set<string>();
+	#sceneWrites: Promise<void> = Promise.resolve();
 	#mediaSync: {
 		stop: () => void;
 		suppress: (ids: string[]) => void;
@@ -154,15 +159,22 @@ export class CollaborationBridge {
 			after: flattenScene({ tracks: after, sceneId }),
 		});
 
-		for (const command of commands) {
-			try {
-				await this.#session.dispatch(command);
-			} catch (error) {
-				// One rejected command must not abandon the rest of the batch; the
-				// server is canonical, and the next snapshot corrects this editor.
-				this.#onError(asError(error));
+		const write = this.#sceneWrites.then(async () => {
+			for (const command of commands) {
+				try {
+					await this.#session.dispatch(command);
+				} catch (error) {
+					// One rejected command must not abandon the rest of the batch; the
+					// server is canonical, and the next snapshot corrects this editor.
+					this.#onError(asError(error));
+				}
 			}
-		}
+		});
+		this.#sceneWrites = write.then(
+			() => undefined,
+			() => undefined,
+		);
+		await write;
 	}
 
 	#followSharedState(): void {
@@ -293,6 +305,7 @@ export class CollaborationBridge {
 	}
 
 	async #removeWhenUnused(assetId: string): Promise<void> {
+		await this.#sceneWrites;
 		for (let attempt = 0; attempt < 12; attempt += 1) {
 			try {
 				await this.#session.dispatch({ kind: "removeAsset", assetId });
@@ -370,10 +383,10 @@ function toCollabAsset(asset: MediaAsset): CollabAsset {
 	return {
 		id: asset.id,
 		name: asset.name,
-		storage: asset.type === "video" || asset.type === "audio" ? "spacetime" : "local",
-		// Video and audio bytes are uploaded as chunks. Anything else stays a
+		storage: sharesMediaBytes(asset.type) ? "spacetime" : "local",
+		// Video, audio, and images are uploaded as chunks. Anything else stays a
 		// local id, which only this browser can resolve.
-		location: asset.type === "video" || asset.type === "audio" ? "chunks" : asset.id,
+		location: sharesMediaBytes(asset.type) ? "chunks" : asset.id,
 		mimeType: playableMimeType({
 			name: asset.name,
 			mimeType: asset.file?.type ?? "",

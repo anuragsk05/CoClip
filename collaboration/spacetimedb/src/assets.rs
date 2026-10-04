@@ -1,8 +1,7 @@
 //! Asset reducers.
 //!
-//! Video and audio bytes are stored in [`AssetChunk`] rows so every editor in
-//! the session can play the same file. Images can still be a local, S3, or R2
-//! reference.
+//! Video, audio, and image bytes are stored in [`AssetChunk`] rows so every
+//! editor in the session can use the same file.
 
 use spacetimedb::{ReducerContext, SpacetimeType, Table};
 

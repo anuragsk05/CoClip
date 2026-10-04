@@ -1,4 +1,4 @@
-/** One slice of a shared video or audio file. Matches the server chunk cap. */
+/** One slice of a shared video, audio, or image file. Matches the server chunk cap. */
 export const MEDIA_CHUNK_BYTES = 256 * 1024;
 
 export interface MediaChunk {

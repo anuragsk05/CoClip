@@ -299,9 +299,9 @@ pub struct ClipEffect {
 
 /// A reference to media.
 ///
-/// Video and audio bytes live in [`AssetChunk`] when `storage` is
-/// [`AssetStorage::Spacetime`]. Images and other files may still be a local
-/// or object-storage reference.
+/// Video, audio, and image bytes live in [`AssetChunk`] when `storage` is
+/// [`AssetStorage::Spacetime`]. Other files may still be a local or
+/// object-storage reference.
 #[spacetimedb::table(accessor = asset, public)]
 pub struct Asset {
     #[primary_key]
@@ -320,7 +320,7 @@ pub struct Asset {
     pub created_at: Timestamp,
 }
 
-/// One slice of a shared video or audio file.
+/// One slice of a shared video, audio, or image file.
 ///
 /// The whole file is the ordered chunks for an asset. Clients subscribe to
 /// these rows and rebuild a local file for playback. Chunks stay small so a
