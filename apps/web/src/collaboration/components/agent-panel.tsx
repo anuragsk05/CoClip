@@ -24,6 +24,12 @@ interface ChatLine {
 	text: string;
 }
 
+interface AgentResponse {
+	reply?: string;
+	error?: string;
+	events?: { type: string; name?: string; result?: { detail: string } }[];
+}
+
 export function AgentPanel() {
 	const { status, canWrite } = useCollaborationState();
 	const projectId = useEditor((editor) => editor.project.getActive().metadata.id);
@@ -53,11 +59,22 @@ export function AgentPanel() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ projectId, prompt: text, mode }),
 			});
-			const payload = (await response.json()) as {
-				reply?: string;
-				error?: string;
-				events?: { type: string; name?: string; result?: { detail: string } }[];
-			};
+			const raw = await response.text();
+			let payload: AgentResponse;
+			try {
+				payload = JSON.parse(raw) as AgentResponse;
+			} catch {
+				setLines((current) => [
+					...current,
+					{
+						role: "agent",
+						text:
+							raw.trim().slice(0, 500) ||
+							"The agent server returned an empty response.",
+					},
+				]);
+				return;
+			}
 
 			if (!response.ok) {
 				setLines((current) => [

@@ -38,14 +38,14 @@ export async function POST(request: Request) {
 		return NextResponse.json({ error: parsed }, { status: 400 });
 	}
 
-	const agent = await CollabAgent.open({
-		uri,
-		database,
-		projectId: parsed.projectId,
-		name: "AI Agent",
-	});
-
+	let agent: CollabAgent | undefined;
 	try {
+		agent = await CollabAgent.open({
+			uri,
+			database,
+			projectId: parsed.projectId,
+			name: "AI Agent",
+		});
 		const outcome = await runAgent({
 			agent,
 			prompt: parsed.prompt,
@@ -54,11 +54,37 @@ export async function POST(request: Request) {
 		});
 		return NextResponse.json(outcome);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		return NextResponse.json({ error: message }, { status: 502 });
+		return NextResponse.json(
+			{ error: agentErrorMessage(error) },
+			{ status: 502 },
+		);
 	} finally {
-		agent.close();
+		agent?.close();
 	}
+}
+
+function agentErrorMessage(error: unknown): string {
+	const message = error instanceof Error ? error.message : String(error);
+	if (
+		message.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED") ||
+		message.includes("UNAUTHENTICATED") ||
+		message.includes("API_KEY_INVALID")
+	) {
+		return "Gemini rejected the API key. Create a new key in AI Studio, put the full key in GEMINI_API_KEY, and restart the dev server.";
+	}
+
+	try {
+		const parsed = JSON.parse(message) as {
+			error?: { message?: string };
+		};
+		if (parsed.error?.message) {
+			return parsed.error.message;
+		}
+	} catch {
+		// The thrown message was already plain text.
+	}
+
+	return message;
 }
 
 function parseBody(body: unknown):
