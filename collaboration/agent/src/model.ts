@@ -21,6 +21,7 @@ import {
 
 import type { CollabAgent, ToolResult } from "./agent";
 import { TOOLS } from "./tools";
+import { parsePromptContext, type PromptContext } from "./prompt-context";
 
 export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
@@ -34,6 +35,7 @@ export type AgentEvent =
 export interface RunOptions {
 	agent: CollabAgent;
 	prompt: string;
+	context?: PromptContext;
 	mode?: AgentMode;
 	apiKey?: string;
 	model?: string;
@@ -56,12 +58,38 @@ editor can do everything you can.
 Rules:
 - Use the clip and track ids from the project listing. Never invent ids.
 - Times are seconds on the timeline, not ticks and not frames.
+- Interpret “this clip” or “these clips” using the selected clip ids in the request context.
+- Selection is context, not permission to ignore an explicit request about other clips.
+- With no selection, ask for clarification when the target is ambiguous.
 - Prefer the smallest edit that satisfies the request.
 - If a tool comes back rejected, read the reason and try a different edit or
   explain why you stopped.
 - After you are done, reply in one or two short sentences saying what changed.`;
 
 export async function runAgent(options: RunOptions): Promise<RunOutcome> {
+	const context = parsePromptContext(options.context);
+	if (typeof context === "string") throw new Error(context);
+	if (context) {
+		if (
+			!options.agent
+				.snapshot()
+				.scenes.some((scene) => scene.id === context.sceneId)
+		) {
+			throw new Error(
+				"The selected scene no longer exists. Reopen the agent and try again.",
+			);
+		}
+		const clipIds = new Set(
+			options.agent
+				.view(context.sceneId)
+				.tracks.flatMap((track) => track.clips.map((clip) => clip.id)),
+		);
+		if (context.selectedClipIds.some((id) => !clipIds.has(id))) {
+			throw new Error(
+				"A selected clip is no longer in this scene. Select your clips again and retry.",
+			);
+		}
+	}
 	const mode = options.mode ?? "chat";
 	const maxSteps = options.maxSteps ?? (mode === "goal" ? 12 : 6);
 	const model = options.model ?? process.env.GEMINI_MODEL ?? DEFAULT_MODEL;
@@ -86,6 +114,7 @@ export async function runAgent(options: RunOptions): Promise<RunOutcome> {
 						agent: options.agent,
 						prompt: options.prompt,
 						mode,
+						context,
 					}),
 				},
 			],
@@ -140,7 +169,7 @@ export async function runAgent(options: RunOptions): Promise<RunOutcome> {
 					response: {
 						ok: results[index]?.ok ?? false,
 						detail: results[index]?.detail ?? "no result",
-						timeline: options.agent.describe(),
+						timeline: options.agent.describe(context?.sceneId),
 					},
 				},
 			})),
@@ -156,17 +185,22 @@ function composeUserTurn({
 	agent,
 	prompt,
 	mode,
+	context,
 }: {
 	agent: CollabAgent;
 	prompt: string;
 	mode: AgentMode;
+	context?: PromptContext;
 }): string {
 	const heading =
 		mode === "goal"
 			? "Goal — keep editing until this is done, then stop."
 			: "Request — do only what is asked.";
 
-	return `${heading}\n\n${prompt}\n\nCurrent timeline:\n${agent.describe()}`;
+	const selection = context
+		? `\n\nRequest context (captured when submitted):\n${JSON.stringify(context)}\nPlayhead is in seconds on this scene's timeline. Selected ids identify what “this” refers to; an empty list means no clips are selected.`
+		: "";
+	return `${heading}\n\n${prompt}${selection}\n\nCurrent timeline:\n${agent.describe(context?.sceneId)}`;
 }
 
 function toDeclarations(): FunctionDeclaration[] {

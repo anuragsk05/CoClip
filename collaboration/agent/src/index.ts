@@ -6,3 +6,6 @@ export { TOOLS, TOOLS_BY_NAME } from "./tools";
 export type { Tool, ToolSchema } from "./tools";
 export { describeProject, toProjectView } from "./view";
 export type { AssetView, ClipView, ProjectView, TrackView } from "./view";
+
+export { parsePromptContext } from "./prompt-context";
+export type { PromptContext } from "./prompt-context";

@@ -88,3 +88,114 @@ test("sends a tool result back to Gemini before the final reply", async () => {
 		]),
 	);
 });
+
+for (const mode of ["chat", "goal"] as const) {
+	test(`${mode} sends selected clips, active scene, and playhead and keeps that scene after tools`, async () => {
+		const requests: Record<string, unknown>[] = [];
+		const describedScenes: Array<string | undefined> = [];
+		const calls: unknown[] = [];
+		globalThis.fetch = (async (_url, init) => {
+			requests.push(JSON.parse(String(init?.body)));
+			return Response.json({
+				candidates: [
+					{
+						content: {
+							role: "model",
+							parts:
+								requests.length === 1
+									? [
+											{
+												functionCall: {
+													name: "set_clip_muted",
+													args: { clipId: "clip-selected", muted: true },
+												},
+											},
+										]
+									: [{ text: "Muted your selected clip." }],
+						},
+					},
+				],
+			});
+		}) as typeof fetch;
+		const agent = {
+			snapshot: () => ({ scenes: [{ id: "scene-second" }] }),
+			view: (sceneId: string) => {
+				expect(sceneId).toBe("scene-second");
+				return {
+					tracks: [{ clips: [{ id: "clip-selected" }, { id: "clip-other" }] }],
+				};
+			},
+			describe: (sceneId?: string) => {
+				describedScenes.push(sceneId);
+				return "Second scene timeline";
+			},
+			call: async (call: unknown) => {
+				calls.push(call);
+				return {
+					tool: "set_clip_muted",
+					ok: true,
+					detail: "Muted clip-selected",
+				};
+			},
+		} as unknown as CollabAgent;
+		const outcome = await runAgent({
+			agent,
+			mode,
+			prompt: "Mute this clip",
+			apiKey: "test-key",
+			context: {
+				sceneId: "scene-second",
+				selectedClipIds: ["clip-selected"],
+				playheadSeconds: 12.5,
+			},
+		});
+		const firstRequest = JSON.stringify(requests[0]);
+		expect(firstRequest).toContain(
+			'\\"selectedClipIds\\":[\\"clip-selected\\"]',
+		);
+		expect(firstRequest).toContain('\\"playheadSeconds\\":12.5');
+		expect(firstRequest).toContain("Second scene timeline");
+		expect(describedScenes).toEqual(["scene-second", "scene-second"]);
+		expect(calls).toEqual([
+			{
+				name: "set_clip_muted",
+				args: { clipId: "clip-selected", muted: true },
+			},
+		]);
+		expect(outcome.reply).toBe("Muted your selected clip.");
+	});
+}
+
+test("rejects stale selection before asking the model or editing", async () => {
+	globalThis.fetch = (() => {
+		throw new Error("Must not call model");
+	}) as unknown as typeof fetch;
+	const agent = {
+		snapshot: () => ({ scenes: [{ id: "scene-1" }] }),
+		view: () => ({ tracks: [{ clips: [{ id: "other-clip" }] }] }),
+	} as unknown as CollabAgent;
+	await expect(
+		runAgent({
+			agent,
+			prompt: "Delete this",
+			apiKey: "test-key",
+			context: {
+				sceneId: "scene-1",
+				selectedClipIds: ["deleted-clip"],
+				playheadSeconds: 0,
+			},
+		}),
+	).rejects.toThrow("selected clip is no longer");
+	await expect(
+		runAgent({
+			agent,
+			prompt: "Delete this",
+			apiKey: "test-key",
+			context: {
+				sceneId: "deleted-scene",
+				selectedClipIds: [],
+				playheadSeconds: 0,
+			},
+		}),
+	).rejects.toThrow("selected scene no longer");
+});

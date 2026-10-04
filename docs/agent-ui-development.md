@@ -67,3 +67,21 @@ key, the UI opens but submitted prompts return a server configuration error.
 
 From the repository root, run `bun run lint:web` and `bun run build:web` before
 shipping. Local preview does not deploy anything.
+
+## Selection-aware prompts
+
+The panel shows the active scene and selected clip name/count. Each submission
+captures that scene, selected clip ids, and playhead (converted from editor ticks
+to seconds). Chat and Goal receive the same context. The agent describes the
+active scene on each tool round-trip, and rejects missing scenes or selected
+clips before starting the model loop. Existing CLI calls without context still
+use the main scene.
+
+Selection helps interpret “this clip” and “these clips”; it is not a hard edit
+restriction. Explicit requests can refer to other clips in the active scene.
+
+To test locally, add two clips, select one, and ask “Mute this clip.” Confirm
+only that clip changes. Select both and ask “Mute these clips.” Try both modes,
+then switch to a second scene and repeat. With no selection, a specific named
+clip request should still work; an ambiguous “this clip” request should prompt
+for clarification. Confirm the context label follows your selection and scene.

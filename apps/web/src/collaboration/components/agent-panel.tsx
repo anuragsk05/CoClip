@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditor } from "@/editor/use-editor";
+import { mediaTimeToSeconds } from "opencut-wasm";
 import { cn } from "@/utils/ui";
 
 import { useCollaborationState } from "../collaboration-provider";
@@ -32,7 +33,27 @@ interface AgentResponse {
 
 export function AgentPanel() {
 	const { status, canWrite } = useCollaborationState();
-	const projectId = useEditor((editor) => editor.project.getActive().metadata.id);
+	const editor = useEditor();
+	const projectId = useEditor(
+		(editor) => editor.project.getActive().metadata.id,
+	);
+	const activeScene = useEditor((editor) =>
+		editor.scenes.getActiveSceneOrNull(),
+	);
+	const selectedElements = useEditor((editor) =>
+		editor.selection.getSelectedElements(),
+	);
+	const selectedNames = selectedElements
+		.map(({ elementId, trackId }) => {
+			const tracks = activeScene?.tracks;
+			const track =
+				tracks &&
+				[tracks.main, ...tracks.overlay, ...tracks.audio].find(
+					(track) => track.id === trackId,
+				);
+			return track?.elements.find((element) => element.id === elementId)?.name;
+		})
+		.filter((name): name is string => Boolean(name));
 	const [open, setOpen] = useState(false);
 	const [mode, setMode] = useState<Mode>("chat");
 	const [prompt, setPrompt] = useState("");
@@ -53,10 +74,29 @@ export function AgentPanel() {
 
 	const submit = async () => {
 		const text = prompt.trim();
-		if (!text || busy) {
+		if (!text || busy || status !== "connected") {
 			return;
 		}
 
+		const scene = editor.scenes.getActiveSceneOrNull();
+		if (!scene) return;
+		const sceneClipIds = new Set(
+			[
+				scene.tracks.main,
+				...scene.tracks.overlay,
+				...scene.tracks.audio,
+			].flatMap((track) => track.elements.map((element) => element.id)),
+		);
+		const context = {
+			sceneId: scene.id,
+			selectedClipIds: editor.selection
+				.getSelectedElements()
+				.map((element) => element.elementId)
+				.filter((id) => sceneClipIds.has(id)),
+			playheadSeconds: mediaTimeToSeconds({
+				time: editor.playback.getCurrentTime(),
+			}),
+		};
 		setPrompt("");
 		setBusy(true);
 		setLines((current) => [...current, { role: "user", text }]);
@@ -65,7 +105,7 @@ export function AgentPanel() {
 			const response = await fetch("/api/collaboration/agent", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ projectId, prompt: text, mode }),
+				body: JSON.stringify({ projectId, prompt: text, mode, context }),
 			});
 			const raw = await response.text();
 			let payload: AgentResponse;
@@ -166,6 +206,14 @@ export function AgentPanel() {
 						</div>
 					</ScrollArea>
 				)}
+				{activeScene && (
+					<p className="text-muted-foreground text-xs" aria-live="polite">
+						Scene: {activeScene.name} ·{" "}
+						{selectedNames.length > 0
+							? `Selected: ${selectedNames.length === 1 ? selectedNames[0] : `${selectedNames.length} clips`}`
+							: "No clips selected"}
+					</p>
+				)}
 				<Textarea
 					aria-label={mode === "goal" ? "Agent goal" : "Agent prompt"}
 					value={prompt}
@@ -185,7 +233,9 @@ export function AgentPanel() {
 				<Button
 					size="sm"
 					onClick={() => void submit()}
-					disabled={busy || status !== "connected" || prompt.trim().length === 0}
+					disabled={
+						busy || status !== "connected" || prompt.trim().length === 0
+					}
 				>
 					{busy ? "Working…" : mode === "goal" ? "Run goal" : "Send"}
 				</Button>
