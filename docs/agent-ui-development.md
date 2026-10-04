@@ -85,3 +85,21 @@ only that clip changes. Select both and ask “Mute these clips.” Try both mod
 then switch to a second scene and repeat. With no selection, a specific named
 clip request should still work; an ambiguous “this clip” request should prompt
 for clarification. Confirm the context label follows your selection and scene.
+
+## AI edit highlights
+
+New agent-authored shared history events briefly outline affected timeline clips
+in purple and show an “AI edited” badge for five seconds. Repeated edits refresh
+the highlight. The outline appears for all connected editors, including viewers,
+and does not replace selection or intercept pointer input. It is ephemeral UI
+state, not a saved project property; reconnecting does not replay old highlights.
+Splits highlight both remaining pieces, effect edits highlight their owner clip,
+and track mute/visibility edits highlight clips on that track. Deleted clips
+cannot be outlined because they are removed from the timeline.
+
+With two photos, select one and ask “Hide this clip.” Watch the selected photo's
+timeline block for a purple outline and badge, then confirm they disappear after
+five seconds. Ask “Show this clip again” and repeat with both selected. Make a
+manual visibility edit and confirm it does not create an AI highlight. Repeat in
+Goal mode and, if possible, with another browser joined to the shared session.
+The highlight can appear while the agent is working, before its final reply.

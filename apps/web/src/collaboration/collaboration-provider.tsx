@@ -12,6 +12,8 @@ import { createContext, useContext, useMemo } from "react";
 
 import { useEditor } from "@/editor/use-editor";
 
+import { AgentEditHighlightsProvider } from "./agent-edit-highlights-provider";
+
 import type { CollaborationState } from "./use-collaboration";
 import { useCollaboration, usePresencePublisher } from "./use-collaboration";
 
@@ -52,7 +54,9 @@ export function CollaborationProvider({
 	return (
 		<CollaborationContext.Provider value={state}>
 			<PresencePublisher />
-			{children}
+			<AgentEditHighlightsProvider session={state.session}>
+				{children}
+			</AgentEditHighlightsProvider>
 		</CollaborationContext.Provider>
 	);
 }
