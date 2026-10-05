@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ReactMarkdownWrapper } from "@/components/ui/react-markdown-wrapper";
 import { cn } from "@/utils/ui";
 
-const LAST_UPDATED = "February 25, 2026";
+const LAST_UPDATED = "October 4th, 2026";
 
 type StatusType = "complete" | "pending" | "default" | "info";
 
@@ -40,12 +40,12 @@ const roadmapItems: RoadmapItem[] = [
 		},
 	},
 	{
-		title: "Essential functionality",
+		title: "Core functionality",
 		description:
-			"Everything that makes a video editor **useful**. Timeline interactivity, storage, effects, transitions, etc.",
+			"Everything that makes a video editor **useful**. Timeline interactivity, storage, effects, transitions, and real-time collaboration.",
 		status: {
-			text: "In progress",
-			type: "pending",
+			text: "Completed",
+			type: "complete",
 		},
 	},
 	{
